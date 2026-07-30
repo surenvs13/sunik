@@ -1,0 +1,6 @@
+{
+  "name": "SUNIK Family Sync",
+  "description": "Smart schedule sync for Dr. Surentheran (Doctor) and Nicole (Lawyer) with AI roster and WhatsApp chat parser",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

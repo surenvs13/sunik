@@ -1,0 +1,998 @@
+import React, { useState } from 'react';
+import { ScheduleEvent, EventCategory, FamilyNames } from '../types';
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Calendar as CalendarIcon, 
+  Plus, 
+  Trash2, 
+  Edit2, 
+  Clock, 
+  MapPin, 
+  AlertCircle, 
+  Check, 
+  X,
+  Sparkles,
+  Filter,
+  Stethoscope,
+  MessageSquare,
+  Loader2,
+  CheckCircle2,
+  Undo2,
+  Heart,
+  Sun
+} from 'lucide-react';
+
+interface Props {
+  events: ScheduleEvent[];
+  onAddEvent: (event: ScheduleEvent) => void;
+  onAddEvents?: (events: ScheduleEvent[]) => void;
+  onDeleteEvent: (id: string) => void;
+  onOpenAddModal: (date?: string, category?: EventCategory) => void;
+  onOpenWhatsAppModal?: () => void;
+  onEditEvent: (event: ScheduleEvent) => void;
+  familyNames: FamilyNames;
+  canUndo?: boolean;
+  onUndo?: () => void;
+}
+
+export const CalendarView: React.FC<Props> = ({
+  events,
+  onAddEvent,
+  onAddEvents,
+  onDeleteEvent,
+  onOpenAddModal,
+  onOpenWhatsAppModal,
+  onEditEvent,
+  familyNames,
+  canUndo,
+  onUndo
+}) => {
+  // Current active month/year state (Default August 2026)
+  const [currentYear, setCurrentYear] = useState(2026);
+  const [currentMonth, setCurrentMonth] = useState(7); // 0-indexed: 7 = August
+
+  // Selected person filter
+  const [selectedPerson, setSelectedPerson] = useState<string>('all');
+
+  // Selected Day Detail Modal
+  const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
+
+  // Main Page Inline WhatsApp Parser state
+  const [isParserExpanded, setIsParserExpanded] = useState(false);
+  const [quickChatText, setQuickChatText] = useState('');
+  const [autoSplitRanges, setAutoSplitRanges] = useState(false);
+  const [isQuickParsing, setIsQuickParsing] = useState(false);
+  const [quickSuccessMsg, setQuickSuccessMsg] = useState('');
+  const [quickErrorMsg, setQuickErrorMsg] = useState('');
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  // Inline Quick WhatsApp Parser Handler directly on main page
+  const handleQuickParseWhatsApp = async () => {
+    if (!quickChatText.trim()) {
+      setQuickErrorMsg('Please paste WhatsApp chat messages to parse.');
+      return;
+    }
+
+    setIsQuickParsing(true);
+    setQuickErrorMsg('');
+    setQuickSuccessMsg('');
+
+    try {
+      const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+      const res = await fetch('/api/parse-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatText: quickChatText,
+          referenceMonthYear: monthStr,
+          familyNames
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!json.success || !json.data) {
+        throw new Error(json.error || 'Failed to parse WhatsApp chat.');
+      }
+
+      const parsed: ScheduleEvent[] = (json.data.events || []).map((ev: any, idx: number) => ({
+        id: `extracted-wa-${Date.now()}-${idx}`,
+        title: ev.title || 'Family Commitment',
+        person: ev.person || familyNames.wife,
+        category: ev.category || 'Court Hearing',
+        startDate: ev.startDate || `${monthStr}-01`,
+        startTime: ev.startTime || '09:00',
+        endDate: ev.endDate || ev.startDate || `${monthStr}-01`,
+        endTime: ev.endTime || '17:00',
+        isCallDuty: Boolean(ev.isCallDuty),
+        isNightShift: Boolean(ev.isNightShift),
+        requiresPostCallRest: Boolean(ev.requiresPostCallRest),
+        location: ev.location || '',
+        notes: ev.notes || '',
+        source: 'wife_whatsapp'
+      }));
+
+      const finalEvents: ScheduleEvent[] = [];
+      parsed.forEach((ev) => {
+        if (autoSplitRanges && ev.startDate !== ev.endDate) {
+          const start = new Date(ev.startDate);
+          const end = new Date(ev.endDate);
+          if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start <= end) {
+            const curr = new Date(start);
+            let dayIdx = 1;
+            while (curr <= end) {
+              const dateStr = curr.toISOString().split('T')[0];
+              finalEvents.push({
+                ...ev,
+                id: `${ev.id}-split-${dayIdx}-${Date.now()}`,
+                title: `${ev.title} (Day ${dayIdx})`,
+                startDate: dateStr,
+                endDate: dateStr,
+              });
+              curr.setDate(curr.getDate() + 1);
+              dayIdx++;
+            }
+          } else {
+            finalEvents.push(ev);
+          }
+        } else {
+          finalEvents.push(ev);
+        }
+      });
+
+      if (finalEvents.length > 0) {
+        if (onAddEvents) {
+          onAddEvents(finalEvents);
+        } else {
+          finalEvents.forEach((p) => onAddEvent(p));
+        }
+        setQuickSuccessMsg(`Successfully parsed & added ${finalEvents.length} schedule events directly to your calendar!`);
+        setQuickChatText('');
+      } else {
+        setQuickErrorMsg('No specific dates/events were detected in the text.');
+      }
+    } catch (err: any) {
+      setQuickErrorMsg(err.message || 'Error communicating with Gemini AI.');
+    } finally {
+      setIsQuickParsing(false);
+    }
+  };
+
+  // Helper to format YYYY-MM
+  const monthString = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+
+  // Filter events by selected person
+  const filteredEvents = events.filter((e) => {
+    if (selectedPerson === 'all') return true;
+    const personLower = (e.person || '').toLowerCase();
+
+    if (selectedPerson === familyNames.husband || selectedPerson.toLowerCase().includes('suren')) {
+      return personLower.includes('suren') || personLower.includes('husband') || e.person === familyNames.husband || e.person === 'Family';
+    }
+    if (selectedPerson === familyNames.wife || selectedPerson.toLowerCase().includes('nicole') || selectedPerson.toLowerCase().includes('nik')) {
+      return personLower.includes('nicole') || personLower.includes('nik') || personLower.includes('wife') || e.person === familyNames.wife || e.person === 'Family';
+    }
+    if (selectedPerson === familyNames.child || selectedPerson.toLowerCase().includes('gerard')) {
+      return personLower.includes('gerard') || personLower.includes('child') || e.person === familyNames.child || e.person === 'Family';
+    }
+    return e.person === selectedPerson;
+  });
+
+  // Calculate calendar grid for selected month
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const startDayOfWeek = firstDayOfMonth.getDay(); // 0 = Sunday
+
+  const prevMonthDays = startDayOfWeek;
+  const totalGridCells = Math.ceil((prevMonthDays + daysInMonth) / 7) * 7;
+
+  // Navigation handlers
+  const handlePrevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear((y) => y - 1);
+    } else {
+      setCurrentMonth((m) => m - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear((y) => y + 1);
+    } else {
+      setCurrentMonth((m) => m + 1);
+    }
+  };
+
+  // Get events for specific date string YYYY-MM-DD (including multi-day date ranges)
+  const getEventsForDate = (dateStr: string) => {
+    return filteredEvents.filter((e) => {
+      const end = e.endDate || e.startDate;
+      return dateStr >= e.startDate && dateStr <= end;
+    });
+  };
+
+  // Helper badge color
+  const getBadgeStyle = (event: ScheduleEvent) => {
+    const personLower = (event.person || '').toLowerCase();
+
+    // Suren (Red theme as requested)
+    if (personLower.includes('suren') || personLower.includes('husband') || event.person === familyNames.husband) {
+      return 'bg-red-100 text-red-900 border-red-300';
+    }
+
+    // Nicole / Nik (Blue theme as requested)
+    if (personLower.includes('nicole') || personLower.includes('nik') || personLower.includes('wife') || event.person === familyNames.wife) {
+      return 'bg-blue-100 text-blue-900 border-blue-300';
+    }
+
+    if (event.category === 'On-Call 24h' || event.isCallDuty) {
+      return 'bg-red-100 text-red-900 border-red-300';
+    }
+    if (event.category === 'Post-Call Rest') {
+      return 'bg-amber-100 text-amber-900 border-amber-300';
+    }
+    if (event.category === 'Court Hearing' || event.category === 'Late Night Call') {
+      return 'bg-blue-100 text-blue-900 border-blue-300';
+    }
+    if (event.category === 'Date Night') {
+      return 'bg-rose-100 text-rose-900 border-rose-300';
+    }
+    if (event.category === 'Family Outing') {
+      return 'bg-emerald-100 text-emerald-900 border-emerald-300';
+    }
+    if (event.person === familyNames.child || personLower.includes('gerard') || event.category === 'Nursery/Daycare') {
+      return 'bg-cyan-100 text-cyan-900 border-cyan-300';
+    }
+    return 'bg-slate-100 text-slate-800 border-slate-300';
+  };
+
+  // Render Day Cells
+  const renderCalendarCells = () => {
+    const cells = [];
+
+    // Previous month filler cells
+    for (let i = 0; i < prevMonthDays; i++) {
+      cells.push(
+        <div key={`prev-${i}`} className="bg-slate-50/50 min-h-[110px] p-2 border-b border-r border-slate-200 opacity-40">
+          <span className="text-xs font-medium text-slate-400"></span>
+        </div>
+      );
+    }
+
+    // Days of current month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayFormatted = String(day).padStart(2, '0');
+      const dateStr = `${monthString}-${dayFormatted}`;
+      const dayEvents = getEventsForDate(dateStr);
+
+      const has24hCall = dayEvents.some((e) => e.category === 'On-Call 24h');
+      const hasPostCallRest = dayEvents.some((e) => e.category === 'Post-Call Rest');
+      const hasLawyerLateCall = dayEvents.some((e) => e.category === 'Late Night Call');
+      const hasDateNight = dayEvents.some((e) => e.category === 'Date Night' || e.category === 'Family Outing');
+
+      cells.push(
+        <div
+          key={`day-${day}`}
+          onClick={() => setSelectedDayDate(dateStr)}
+          className={`min-h-[110px] p-2 border-b border-r border-slate-200 bg-white hover:bg-slate-50/80 transition-all cursor-pointer relative flex flex-col justify-between group ${
+            has24hCall ? 'bg-red-50/30 ring-1 ring-red-400/50' : ''
+          }`}
+        >
+          {/* Day Number Header */}
+          <div className="flex items-center justify-between">
+            <span
+              className={`text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center ${
+                day === 3 || day === 8 || day === 12
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-700 group-hover:text-slate-900'
+              }`}
+            >
+              {day}
+            </span>
+
+            <div className="flex items-center gap-1">
+              {has24hCall && (
+                <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" title="24h Hospital On-Call" />
+              )}
+              {hasLawyerLateCall && (
+                <span className="w-2 h-2 rounded-full bg-indigo-600" title="Lawyer Late Night Call" />
+              )}
+              {hasDateNight && (
+                <span className="w-2 h-2 rounded-full bg-emerald-500" title="Date Night / Family Time" />
+              )}
+              {dayEvents.length > 0 && (
+                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">
+                  {dayEvents.length}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Top 2 Event Badges */}
+          <div className="space-y-1 my-1 overflow-hidden">
+            {dayEvents.slice(0, 2).map((ev) => (
+              <div
+                key={ev.id}
+                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border truncate ${getBadgeStyle(ev)}`}
+              >
+                {ev.startTime} {ev.title}
+              </div>
+            ))}
+            {dayEvents.length > 2 && (
+              <div className="text-[9px] font-bold text-slate-500 hover:text-slate-700 pl-1">
+                +{dayEvents.length - 2} more...
+              </div>
+            )}
+          </div>
+
+          {/* Plus Add Hover Button */}
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex justify-end">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenAddModal(dateStr);
+              }}
+              className="p-1 rounded-md bg-sky-600 text-white hover:bg-sky-700 shadow-xs"
+              title="Add event to this date"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Remaining filler cells
+    const remainingCells = totalGridCells - (prevMonthDays + daysInMonth);
+    for (let i = 0; i < remainingCells; i++) {
+      cells.push(
+        <div key={`next-${i}`} className="bg-slate-50/50 min-h-[110px] p-2 border-b border-r border-slate-200 opacity-40"></div>
+      );
+    }
+
+    return cells;
+  };
+
+  // Events for day modal
+  const dayModalEvents = selectedDayDate ? getEventsForDate(selectedDayDate) : [];
+
+  return (
+    <div className="space-y-5">
+      {/* Calendar Bar & Person Filter */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Month Navigation */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handlePrevMonth}
+            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="w-5 h-5 text-sky-600" />
+            <h2 className="text-lg font-black text-slate-900">
+              {monthNames[currentMonth]} {currentYear}
+            </h2>
+          </div>
+          <button
+            onClick={handleNextMonth}
+            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Person Filters */}
+        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200">
+          <span className="text-xs font-semibold text-slate-500 px-2 flex items-center gap-1">
+            <Filter className="w-3.5 h-3.5" /> Person:
+          </span>
+
+          <button
+            onClick={() => setSelectedPerson('all')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+              selectedPerson === 'all'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            All Family
+          </button>
+
+          <button
+            onClick={() => setSelectedPerson(familyNames.husband)}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1 ${
+              selectedPerson === familyNames.husband
+                ? 'bg-red-600 text-white shadow-xs'
+                : 'text-red-700 hover:bg-red-50'
+            }`}
+          >
+            <span>🩺 {familyNames.husband}</span>
+          </button>
+
+          <button
+            onClick={() => setSelectedPerson(familyNames.wife)}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1 ${
+              selectedPerson === familyNames.wife
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-blue-700 hover:bg-blue-50'
+            }`}
+          >
+            <span>⚖️ {familyNames.wife}</span>
+          </button>
+
+          <button
+            onClick={() => setSelectedPerson(familyNames.child)}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1 ${
+              selectedPerson === familyNames.child
+                ? 'bg-cyan-600 text-white shadow-xs'
+                : 'text-cyan-700 hover:bg-cyan-50'
+            }`}
+          >
+            <span>🧸 {familyNames.child}</span>
+          </button>
+
+          <button
+            onClick={() => setSelectedPerson('Family')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1 ${
+              selectedPerson === 'Family'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-emerald-700 hover:bg-emerald-50'
+            }`}
+          >
+            <span>👨‍👩‍👦 Joint Family</span>
+          </button>
+        </div>
+
+        {/* Add Event Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            onClick={() => setIsParserExpanded(!isParserExpanded)}
+            className={`px-3.5 py-2 text-xs font-black rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 ${
+              isParserExpanded
+                ? 'bg-emerald-700 text-white ring-2 ring-emerald-400'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+            }`}
+            title="Parse WhatsApp Chat with AI on Main Page"
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>💬 Parse WhatsApp Chat</span>
+          </button>
+
+          <button
+            onClick={() => onOpenAddModal(undefined, 'On-Call 24h')}
+            className="px-3.5 py-2 text-xs font-black text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5"
+            title="Add a 24-Hour Doctor On-Call Duty"
+          >
+            <Stethoscope className="w-4 h-4" />
+            <span>Add 24h Call</span>
+          </button>
+
+          <button
+            onClick={() => onOpenAddModal()}
+            className="px-3.5 py-2 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Custom Event</span>
+          </button>
+
+          {canUndo && onUndo && (
+            <button
+              onClick={onUndo}
+              className="px-3.5 py-2 text-xs font-black text-slate-900 bg-amber-400 hover:bg-amber-300 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 border border-amber-300 animate-in fade-in duration-150"
+              title="Undo last added or cancelled event"
+            >
+              <Undo2 className="w-4 h-4 text-slate-900" />
+              <span>Undo Action</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Page WhatsApp Parser Widget */}
+      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white rounded-2xl p-4 shadow-md border border-emerald-800/60">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="p-2 bg-emerald-500/20 text-emerald-300 rounded-xl border border-emerald-400/30">
+              <MessageSquare className="w-5 h-5" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-black text-white">WhatsApp Schedule Parser</h3>
+                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 bg-emerald-500/30 text-emerald-300 rounded-full border border-emerald-400/30">
+                  Main Screen AI Active
+                </span>
+              </div>
+              <p className="text-xs text-emerald-200 mt-0.5">
+                Paste WhatsApp messages here to instantly extract lawyer calls, court dates &amp; toddler activities directly onto your calendar
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsParserExpanded(!isParserExpanded)}
+            className="px-3.5 py-1.5 text-xs font-bold bg-white/10 hover:bg-white/20 rounded-xl text-white transition-colors shrink-0 flex items-center gap-1"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
+            <span>{isParserExpanded ? 'Hide Parser' : 'Open WhatsApp Parser'}</span>
+          </button>
+        </div>
+
+        {/* Expanded Parser Form on Main Screen */}
+        {isParserExpanded && (
+          <div className="mt-3.5 pt-3 border-t border-emerald-800/80 space-y-3 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-emerald-100 flex items-center gap-1">
+                <span>Paste Chat Text:</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setQuickChatText(
+                  `Nicole: High Court Trial from ${monthString}-10 to ${monthString}-14 09:00-16:00. Late client calls on ${monthString}-18, 19, and 20 21:00-23:00. Gerard toddler camp ${monthString}-24 to ${monthString}-28.`
+                )}
+                className="text-[11px] font-extrabold text-emerald-300 hover:text-white underline"
+              >
+                + Fill Sample Roster &amp; Schedule Chat
+              </button>
+            </div>
+
+            <textarea
+              rows={3}
+              value={quickChatText}
+              onChange={(e) => setQuickChatText(e.target.value)}
+              placeholder="e.g. 'Nicole: High Court trial from Aug 10 to Aug 14 09:00-16:00. Gerard toddler camp Aug 24-28. Late calls on Aug 18, 19, and 20 from 9pm to 11pm.'"
+              className="w-full px-3.5 py-2.5 text-xs bg-slate-950/80 text-emerald-100 border border-emerald-700/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 font-mono"
+            />
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <label className="flex items-center gap-2 text-xs text-emerald-200 font-bold cursor-pointer hover:text-white">
+                <input
+                  type="checkbox"
+                  checked={autoSplitRanges}
+                  onChange={(e) => setAutoSplitRanges(e.target.checked)}
+                  className="rounded border-emerald-600 text-emerald-500 focus:ring-emerald-400 bg-slate-900 w-4 h-4"
+                />
+                <span>Split multi-day ranges into separate daily entries</span>
+              </label>
+
+              <div className="flex items-center gap-2">
+                {onOpenWhatsAppModal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsParserExpanded(false);
+                      onOpenWhatsAppModal();
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold bg-emerald-950/80 text-emerald-200 hover:text-white border border-emerald-700/60 rounded-xl transition-colors"
+                  >
+                    Full Multi-Day Modal
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  disabled={isQuickParsing || !quickChatText.trim()}
+                  onClick={handleQuickParseWhatsApp}
+                  className="px-5 py-2 text-xs font-black text-slate-900 bg-emerald-400 hover:bg-emerald-300 disabled:opacity-50 rounded-xl shadow-md transition-all flex items-center gap-1.5"
+                >
+                  {isQuickParsing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Gemini Parsing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-slate-900" />
+                      <span>Parse &amp; Add to Calendar</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {quickErrorMsg && (
+              <div className="p-2.5 bg-red-900/60 border border-red-500/50 text-red-200 text-xs rounded-xl flex items-center gap-2 font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                <span>{quickErrorMsg}</span>
+              </div>
+            )}
+
+            {quickSuccessMsg && (
+              <div className="p-2.5 bg-emerald-950/90 border border-emerald-500/50 text-emerald-200 text-xs rounded-xl flex items-center gap-2 font-bold">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>{quickSuccessMsg}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Main Screen Smart Recommendations Section */}
+      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <div className="flex items-center gap-2 text-rose-600 font-extrabold text-xs uppercase tracking-wider">
+              <Sparkles className="w-4 h-4" />
+              <span>Recommended Monthly Outings &amp; Date Nights</span>
+            </div>
+            <h3 className="text-base font-black text-slate-900 mt-0.5">
+              3 Recommended Date Nights + 3 Family Outings ({monthNames[currentMonth]} {currentYear})
+            </h3>
+          </div>
+          <span className="text-xs text-slate-500 font-medium bg-slate-100 px-3 py-1 rounded-full w-fit">
+            Featuring Suren&apos;s Post-Call Rest Evenings
+          </span>
+        </div>
+
+        {/* 3 Date Night Recommendations */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-black uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
+            <Heart className="w-4 h-4 text-rose-500" />
+            <span>💖 3 Recommended Couple Date Nights (Suren &amp; Nicole)</span>
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              {
+                id: 'rec-date-1',
+                title: 'Date Night #1: Post-Call Evening Dinner',
+                date: `${monthString}-04`,
+                time: '18:30 - 21:30',
+                note: 'Post-Call Evening! Dr. Surentheran completed daytime sleep recovery at 16:00 and is fully refreshed.',
+                category: 'Date Night' as EventCategory
+              },
+              {
+                id: 'rec-date-2',
+                title: 'Date Night #2: Japanese Omakase Night',
+                date: `${monthString}-12`,
+                time: '19:45 - 22:00',
+                note: 'Gerard asleep at home with Nanny Maya! Zero hospital or lawyer calls.',
+                category: 'Date Night' as EventCategory
+              },
+              {
+                id: 'rec-date-3',
+                title: 'Date Night #3: Post-Call Sunset Cocktails',
+                date: `${monthString}-24`,
+                time: '18:30 - 21:30',
+                note: 'Post-Call Evening! Suren fully rested after post-call sleep recovery.',
+                category: 'Date Night' as EventCategory
+              }
+            ].map((item) => {
+              const isAlreadyAdded = events.some((e) => e.startDate === item.date && e.title.includes('Date Night'));
+
+              return (
+                <div
+                  key={item.id}
+                  className="bg-rose-50/50 border border-rose-200/80 rounded-xl p-3 flex flex-col justify-between hover:border-rose-300 transition-all"
+                >
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] font-bold text-rose-800 mb-1">
+                      <span>{item.date}</span>
+                      <span>{item.time}</span>
+                    </div>
+                    <div className="text-xs font-bold text-slate-900 mb-1">{item.title}</div>
+                    <p className="text-[11px] text-slate-600 leading-snug mb-3">{item.note}</p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (!isAlreadyAdded) {
+                        onAddEvent({
+                          id: `rec-added-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                          title: item.title,
+                          person: 'Family',
+                          category: item.category,
+                          startDate: item.date,
+                          startTime: item.time.split(' - ')[0],
+                          endDate: item.date,
+                          endTime: item.time.split(' - ')[1],
+                          location: 'Favorite Restaurant',
+                          notes: item.note,
+                          source: 'ai_suggested'
+                        });
+                      }
+                    }}
+                    className={`w-full py-1.5 px-3 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 ${
+                      isAlreadyAdded
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-rose-600 hover:bg-rose-700 text-white shadow-xs'
+                    }`}
+                  >
+                    {isAlreadyAdded ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Scheduled in Calendar</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Date Night to Calendar</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 3 Family Time Recommendations */}
+        <div className="space-y-2 pt-2 border-t border-slate-100">
+          <h4 className="text-xs font-black uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
+            <Sun className="w-4 h-4 text-emerald-500" />
+            <span>👨‍👩‍👦 3 Recommended Family Time Outings (Suren, Nicole &amp; Gerard)</span>
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              {
+                id: 'rec-fam-1',
+                title: 'Family Time #1: Botanical Gardens & Ice Cream',
+                date: `${monthString}-08`,
+                time: '15:30 - 18:00',
+                note: 'Dr. Surentheran & Lawyer Nicole both free! Playground & ice cream with 2yo Gerard.',
+                category: 'Family Outing' as EventCategory
+              },
+              {
+                id: 'rec-fam-2',
+                title: 'Family Time #2: Post-Call Sunday Beach & Splash Park',
+                date: `${monthString}-16`,
+                time: '15:30 - 18:30',
+                note: 'Suren post-call sleep completes at 15:00. Afternoon beach outing with Suren, Nicole & Gerard!',
+                category: 'Family Outing' as EventCategory
+              },
+              {
+                id: 'rec-fam-3',
+                title: 'Family Time #3: Sunday City Zoo & Picnic Day',
+                date: `${monthString}-22`,
+                time: '10:00 - 14:30',
+                note: 'Golden weekend window! Zero calls or hospital duty for both parents all day.',
+                category: 'Family Outing' as EventCategory
+              }
+            ].map((item) => {
+              const isAlreadyAdded = events.some((e) => e.startDate === item.date && (e.title.includes('Family Time') || e.title.includes('Family Saturday') || e.title.includes('Sunday Family')));
+
+              return (
+                <div
+                  key={item.id}
+                  className="bg-emerald-50/50 border border-emerald-200/80 rounded-xl p-3 flex flex-col justify-between hover:border-emerald-300 transition-all"
+                >
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] font-bold text-emerald-800 mb-1">
+                      <span>{item.date}</span>
+                      <span>{item.time}</span>
+                    </div>
+                    <div className="text-xs font-bold text-slate-900 mb-1">{item.title}</div>
+                    <p className="text-[11px] text-slate-600 leading-snug mb-3">{item.note}</p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (!isAlreadyAdded) {
+                        onAddEvent({
+                          id: `rec-added-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                          title: item.title,
+                          person: 'Family',
+                          category: item.category,
+                          startDate: item.date,
+                          startTime: item.time.split(' - ')[0],
+                          endDate: item.date,
+                          endTime: item.time.split(' - ')[1],
+                          location: 'Family Outing Park / Zoo',
+                          notes: item.note,
+                          source: 'ai_suggested'
+                        });
+                      }
+                    }}
+                    className={`w-full py-1.5 px-3 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 ${
+                      isAlreadyAdded
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                    }`}
+                  >
+                    {isAlreadyAdded ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Scheduled in Calendar</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Family Time to Calendar</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Legend Bar */}
+      <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-600 px-2">
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-red-600" />
+          <span>Hospital 24h On-Call / Night Duty</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-amber-500" />
+          <span>Doctor Post-Call Recovery</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-indigo-600" />
+          <span>Lawyer Court / Late Calls</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-emerald-500" />
+          <span>Free Family & Date Night</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-cyan-500" />
+          <span>2yo Noah Care / Nursery</span>
+        </div>
+      </div>
+
+      {/* Calendar Grid Container */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        {/* Day of Week Headers */}
+        <div className="grid grid-cols-7 bg-slate-900 text-white text-xs font-bold text-center border-b border-slate-800">
+          <div className="py-3">SUN</div>
+          <div className="py-3">MON</div>
+          <div className="py-3">TUE</div>
+          <div className="py-3">WED</div>
+          <div className="py-3">THU</div>
+          <div className="py-3">FRI</div>
+          <div className="py-3">SAT</div>
+        </div>
+
+        {/* Grid Cells */}
+        <div className="grid grid-cols-7 border-l border-t border-slate-200">
+          {renderCalendarCells()}
+        </div>
+      </div>
+
+      {/* Day Detail Modal Drawer */}
+      {selectedDayDate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden">
+            {/* Header */}
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4 text-sky-400" />
+                  Schedule for {selectedDayDate}
+                </h3>
+                <p className="text-xs text-slate-300">
+                  {dayModalEvents.length} events scheduled on this day
+                </p>
+              </div>
+
+              <button
+                onClick={() => setSelectedDayDate(null)}
+                className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+              {dayModalEvents.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <p className="text-xs">No events scheduled for this day.</p>
+                  <button
+                    onClick={() => {
+                      const dt = selectedDayDate;
+                      setSelectedDayDate(null);
+                      onOpenAddModal(dt);
+                    }}
+                    className="mt-3 px-4 py-2 text-xs font-bold bg-sky-600 text-white rounded-xl hover:bg-sky-700 transition-colors"
+                  >
+                    + Add Event for {selectedDayDate}
+                  </button>
+                </div>
+              ) : (
+                dayModalEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className={`p-4 rounded-xl border shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${getBadgeStyle(event)}`}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-bold text-slate-900">{event.title}</span>
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-white/80 border border-slate-200">
+                          {event.person}
+                        </span>
+                      </div>
+
+                      <div className="text-xs text-slate-700 flex flex-wrap items-center gap-3">
+                        <span className="flex items-center gap-1 font-semibold">
+                          <Clock className="w-3.5 h-3.5" />
+                          {event.startTime} - {event.endTime}
+                        </span>
+                        {event.location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5" />
+                            {event.location}
+                          </span>
+                        )}
+                      </div>
+
+                      {event.notes && (
+                        <p className="text-xs text-slate-600 mt-1 italic">
+                          "{event.notes}"
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => {
+                          setSelectedDayDate(null);
+                          onEditEvent(event);
+                        }}
+                        className="p-1.5 rounded-lg bg-white/80 hover:bg-white text-slate-700 transition-colors shadow-2xs"
+                        title="Edit event"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteEvent(event.id)}
+                        className="p-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition-colors"
+                        title="Delete event"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const dt = selectedDayDate;
+                    setSelectedDayDate(null);
+                    onOpenAddModal(dt, 'On-Call 24h');
+                  }}
+                  className="px-3.5 py-2 text-xs font-black text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+                >
+                  <Stethoscope className="w-3.5 h-3.5" />
+                  <span>Add 24h Call</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const dt = selectedDayDate;
+                    setSelectedDayDate(null);
+                    onOpenAddModal(dt);
+                  }}
+                  className="px-3.5 py-2 text-xs font-bold text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 rounded-xl transition-colors flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Custom Event</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => setSelectedDayDate(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
