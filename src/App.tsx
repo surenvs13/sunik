@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ScheduleEvent, FreeSlot, ChildcareGap, AIAnalysisResult, FamilyNames, EventCategory, ActivityLogItem } from './types';
 import { INITIAL_EVENTS, INITIAL_FREE_SLOTS, INITIAL_CHILDCARE_GAPS, INITIAL_FAMILY_NAMES } from './data/initialData';
+import { ensurePostCallRestForEvents } from './utils/rosterUtils';
 import { Navbar } from './components/Navbar';
 import { CalendarView } from './components/CalendarView';
 import { FreeTimingsView } from './components/FreeTimingsView';
@@ -10,6 +11,7 @@ import { ChildcareTracker } from './components/ChildcareTracker';
 import { AddEventModal } from './components/AddEventModal';
 import { EditFamilyModal } from './components/EditFamilyModal';
 import { WhatsAppParserModal } from './components/WhatsAppParserModal';
+import { Trash2 } from 'lucide-react';
 
 export default function App() {
   // Family Names state with LocalStorage Persistence
@@ -21,7 +23,8 @@ export default function App() {
   // Main Events State with LocalStorage Persistence
   const [events, setEvents] = useState<ScheduleEvent[]>(() => {
     const saved = localStorage.getItem('sunik_events') || localStorage.getItem('medfamily_events');
-    return saved ? JSON.parse(saved) : INITIAL_EVENTS;
+    const parsed = saved ? JSON.parse(saved) : INITIAL_EVENTS;
+    return ensurePostCallRestForEvents(parsed, familyNames.husband);
   });
 
   // Activity Log State with LocalStorage Persistence
@@ -67,6 +70,7 @@ export default function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditNamesModalOpen, setIsEditNamesModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
   const [modalInitialDate, setModalInitialDate] = useState<string | undefined>(undefined);
   const [modalInitialCategory, setModalInitialCategory] = useState<EventCategory | undefined>(undefined);
   const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
@@ -209,7 +213,7 @@ export default function App() {
         if (e.person === oldWife || e.person === 'Wife (Lawyer)') {
           return { ...e, person: newNames.wife };
         }
-        if (e.person === oldChild || e.person === 'Noah (2yo)') {
+        if (e.person === oldChild || e.person === 'Noah (2yo)' || e.person === 'Gerard (2yo)') {
           return { ...e, person: newNames.child };
         }
         return e;
@@ -224,7 +228,7 @@ export default function App() {
     const person = newEvents.length === 1 ? newEvents[0].person : 'Family';
     const date = newEvents.length === 1 ? newEvents[0].startDate : `${newEvents[0].startDate} onwards`;
     recordAction('BATCH_ADD', `Added ${newEvents.length > 1 ? `${newEvents.length} events` : `event: "${title}"`}`, person, title, date);
-    setEvents((prev) => [...prev, ...newEvents]);
+    setEvents((prev) => ensurePostCallRestForEvents([...prev, ...newEvents], familyNames.husband));
   };
 
   // Save Single Event (Add or Edit)
@@ -244,7 +248,7 @@ export default function App() {
       if (additionalEvents && additionalEvents.length > 0) {
         updated = [...updated, ...additionalEvents];
       }
-      return updated;
+      return ensurePostCallRestForEvents(updated, familyNames.husband);
     });
   };
 
@@ -261,6 +265,57 @@ export default function App() {
       );
     }
     setEvents((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  // Delete All Events
+  const handleDeleteAllEvents = () => {
+    if (events.length === 0) return;
+    recordAction(
+      'DELETE',
+      `Cleared / Deleted all ${events.length} event(s) from calendar`,
+      'All',
+      'All Events',
+      'All'
+    );
+    setEvents([]);
+    setIsDeleteAllModalOpen(false);
+  };
+
+  // Cancel All Call Duties for a Specific Month
+  const handleCancelMonthCallDuties = (year: number, month: number) => {
+    // month is 0-indexed (0 = Jan, 7 = Aug)
+    const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const monthName = new Date(year, month, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+    const callDutiesInMonth = events.filter((e) => {
+      const isCallCategory =
+        e.category === 'On-Call 24h' ||
+        e.category === 'Night Shift' ||
+        e.isCallDuty === true ||
+        e.category === 'Post-Call Rest' ||
+        e.requiresPostCallRest === true;
+
+      const matchesMonth =
+        (e.startDate && e.startDate.startsWith(monthPrefix)) ||
+        (e.endDate && e.endDate.startsWith(monthPrefix));
+
+      return matchesMonth && isCallCategory;
+    });
+
+    if (callDutiesInMonth.length === 0) return 0;
+
+    recordAction(
+      'DELETE',
+      `Cancelled all ${callDutiesInMonth.length} call duty shift(s) & post-call rest windows for ${monthName}`,
+      familyNames.husband,
+      `Call Duties for ${monthName}`,
+      monthPrefix
+    );
+
+    const callIdsToRemove = new Set(callDutiesInMonth.map((c) => c.id));
+    setEvents((prev) => prev.filter((e) => !callIdsToRemove.has(e.id)));
+
+    return callDutiesInMonth.length;
   };
 
   // Lock Free Slot to Calendar
@@ -303,6 +358,7 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onResetData={handleResetDemoData}
+        onDeleteAllEvents={() => setIsDeleteAllModalOpen(true)}
         eventCount={events.length}
         freeSlotsCount={freeSlots.length}
         gapsCount={childcareGaps.length}
@@ -323,6 +379,8 @@ export default function App() {
             onAddEvent={(ev) => handleAddEvents([ev])}
             onAddEvents={handleAddEvents}
             onDeleteEvent={handleDeleteEvent}
+            onDeleteAllEvents={() => setIsDeleteAllModalOpen(true)}
+            onCancelMonthCallDuties={handleCancelMonthCallDuties}
             onOpenAddModal={(date, category) => {
               setModalInitialDate(date);
               setModalInitialCategory(category);
@@ -335,6 +393,7 @@ export default function App() {
               setIsAddModalOpen(true);
             }}
             familyNames={familyNames}
+            onOpenEditNames={() => setIsEditNamesModalOpen(true)}
             canUndo={canUndo}
             onUndo={handleUndo}
           />
@@ -412,7 +471,7 @@ export default function App() {
         isOpen={isEditNamesModalOpen}
         onClose={() => setIsEditNamesModalOpen(false)}
         familyNames={familyNames}
-        onSave={handleSaveFamilyNames}
+        onSaveFamilyNames={handleSaveFamilyNames}
       />
 
       {/* WhatsApp Parser Modal */}
@@ -422,6 +481,48 @@ export default function App() {
         onAddEvents={handleAddEvents}
         familyNames={familyNames}
       />
+
+      {/* Delete All Events Confirmation Modal */}
+      {isDeleteAllModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-slate-800">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-3 bg-rose-100 rounded-full border border-rose-200 shrink-0">
+                <Trash2 className="w-6 h-6 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Delete All Calendar Events?</h3>
+                <p className="text-xs text-rose-700 font-bold">This will clear {events.length} schedule entry(s)</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              Are you sure you want to delete all <strong className="text-slate-900 font-bold">{events.length} event(s)</strong> currently on your calendar?
+              This will remove all hospital on-call shifts, legal court hearings, childcare duties, and date nights.
+              <br /><br />
+              <span className="text-emerald-700 font-bold">💡 Note: You can easily restore deleted events anytime using the &quot;Undo Action&quot; button in the header or history log.</span>
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsDeleteAllModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAllEvents}
+                className="px-5 py-2 text-xs font-black text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-colors flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Yes, Delete All Events</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

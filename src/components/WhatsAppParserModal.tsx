@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ScheduleEvent, FamilyNames } from '../types';
 import { SAMPLE_WHATSAPP_CHAT_TEXT } from '../data/initialData';
+import { ensurePostCallRestForEvents } from '../utils/rosterUtils';
 import { 
   MessageSquare, 
   Sparkles, 
@@ -108,14 +109,16 @@ export const WhatsAppParserModal: React.FC<Props> = ({
         };
       });
 
-      setExtractedEvents(parsed);
-      setSelectedIds(new Set(parsed.map((p) => p.id)));
+      const withRest = ensurePostCallRestForEvents(parsed, familyNames.husband);
 
-      const multiDayCount = parsed.filter((p) => p.startDate !== p.endDate).length;
+      setExtractedEvents(withRest);
+      setSelectedIds(new Set(withRest.map((p) => p.id)));
+
+      const multiDayCount = withRest.filter((p) => p.startDate !== p.endDate).length;
       if (multiDayCount > 0) {
-        setSuccessMessage(`Extracted ${parsed.length} schedule items (including ${multiDayCount} multi-day date range events)!`);
+        setSuccessMessage(`Extracted ${withRest.length} schedule items (including ${multiDayCount} multi-day date range events and post-call rest)!`);
       } else {
-        setSuccessMessage(`Successfully extracted ${parsed.length} schedule items using Gemini AI!`);
+        setSuccessMessage(`Successfully extracted ${withRest.length} schedule items and post-call rest windows!`);
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Error parsing chat text with AI.');

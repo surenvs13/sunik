@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ScheduleEvent, FamilyNames } from '../types';
 import { SAMPLE_HOSPITAL_ROSTER_TEXT, SAMPLE_WHATSAPP_CHAT_TEXT } from '../data/initialData';
+import { ensurePostCallRestForEvents } from '../utils/rosterUtils';
 import { 
   FileText, 
   MessageSquare, 
@@ -134,9 +135,11 @@ export const ImportSection: React.FC<Props> = ({ onAddEvents, familyNames }) => 
         source: 'doctor_roster'
       }));
 
-      setExtractedEvents(parsed);
-      setSelectedIds(new Set(parsed.map((p) => p.id)));
-      setSuccessMessage(`Successfully extracted ${parsed.length} hospital roster shifts!`);
+      const withRest = ensurePostCallRestForEvents(parsed, familyNames.husband);
+
+      setExtractedEvents(withRest);
+      setSelectedIds(new Set(withRest.map((p) => p.id)));
+      setSuccessMessage(`Successfully extracted ${withRest.length} hospital roster shift(s) and post-call rest windows!`);
     } catch (err: any) {
       setErrorMessage(err.message || 'Error communicating with Gemini AI.');
     } finally {
@@ -229,7 +232,7 @@ export const ImportSection: React.FC<Props> = ({ onAddEvents, familyNames }) => 
             <h2 className="text-lg font-bold">AI Document & WhatsApp Schedule Parser</h2>
           </div>
           <p className="text-xs text-slate-300 mt-1">
-            Seamlessly import hospital doctor call rosters (PDF/Excel) & lawyer wife WhatsApp messages using Gemini AI
+            Seamlessly import Suren&apos;s hospital doctor call rosters (PDF/Excel) &amp; Nicole&apos;s WhatsApp messages using Gemini AI
           </p>
         </div>
 
@@ -269,7 +272,7 @@ export const ImportSection: React.FC<Props> = ({ onAddEvents, familyNames }) => 
           }`}
         >
           <MessageSquare className="w-4 h-4" />
-          <span>2. Lawyer Wife & Family WhatsApp Messages</span>
+          <span>2. Nicole &amp; Family WhatsApp Messages</span>
         </button>
       </div>
 
@@ -363,14 +366,14 @@ export const ImportSection: React.FC<Props> = ({ onAddEvents, familyNames }) => 
           </div>
         )}
 
-        {/* Tab 2: Lawyer Wife WhatsApp Messages */}
+        {/* Tab 2: Nicole WhatsApp Messages */}
         {activeTab === 'whatsapp' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                   <MessageSquare className="w-4 h-4 text-indigo-600" />
-                  Lawyer Wife & Family WhatsApp Chat
+                  Nicole &amp; Family WhatsApp Chat
                 </h3>
                 <p className="text-xs text-slate-500">
                   Paste copied WhatsApp messages containing court dates, late night calls, nursery activities, or pediatrician visits
@@ -391,7 +394,7 @@ export const ImportSection: React.FC<Props> = ({ onAddEvents, familyNames }) => 
                 rows={8}
                 value={whatsappText}
                 onChange={(e) => setWhatsappText(e.target.value)}
-                placeholder="Paste WhatsApp messages here... e.g.&#10;Wife: Mon Aug 3 High Court trial 9am-4:30pm, then late night US call 9:30pm-11:30pm&#10;Wife: Pediatrician visit Friday Aug 7 at 4pm..."
+                placeholder="Paste WhatsApp messages here... e.g.&#10;Nicole: Mon Aug 3 High Court trial 9am-4:30pm, then late night US call 9:30pm-11:30pm&#10;Nicole: Pediatrician visit Friday Aug 7 at 4pm..."
                 className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl font-sans focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               />
             </div>
@@ -487,11 +490,11 @@ export const ImportSection: React.FC<Props> = ({ onAddEvents, familyNames }) => 
                           <span className="text-xs font-bold text-slate-900">{event.title}</span>
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              event.person === 'Dr. Husband'
+                              event.person === familyNames.husband || event.person.includes('Suren')
                                 ? 'bg-red-100 text-red-800'
-                                : event.person === 'Wife (Lawyer)'
+                                : event.person === familyNames.wife || event.person.includes('Nicole')
                                 ? 'bg-indigo-100 text-indigo-800'
-                                : event.person === 'Noah (2yo)'
+                                : event.person === familyNames.child || event.person.includes('Gerard')
                                 ? 'bg-cyan-100 text-cyan-800'
                                 : 'bg-emerald-100 text-emerald-800'
                             }`}

@@ -4,7 +4,7 @@ export interface FamilyNames {
   child: string;
 }
 
-export type PersonType = string; // Dr. Surentheran | Nicole (Lawyer) | Gerard (2yo) | Family or custom names
+export type PersonType = string; // Suren | Nicole | Gerard (2yo) | Family or custom names
 
 export type EventCategory = 
   | 'On-Call 24h'
@@ -21,6 +21,7 @@ export type EventCategory =
   | 'Family Outing'
   | 'Date Night'
   | 'Bedtime Routine'
+  | 'Church/Catechism'
   | 'Custom Event'
   | 'Other';
 

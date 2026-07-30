@@ -17,6 +17,21 @@ export const FreeTimingsView: React.FC<Props> = ({
   const [filterType, setFilterType] = useState<string>('all');
   const [lockedIds, setLockedIds] = useState<Set<string>>(new Set());
 
+  // Filter slots to strictly Quality Family Time and Couple Date Nights only
+  const availableFreeSlots = freeSlots.filter(
+    (slot) => slot.type === 'couple_date' || slot.type === 'quality_family'
+  );
+
+  const getCleanFirstName = (name: string) => {
+    if (!name) return '';
+    const cleaned = name.replace(/^(Dr\.|Mrs\.|Mr\.|Ms\.|Lawyer)\s+/i, '');
+    return cleaned.split(' ')[0] || name;
+  };
+
+  const surenName = getCleanFirstName(familyNames.husband) || 'Suren';
+  const nicoleName = getCleanFirstName(familyNames.wife) || 'Nicole';
+  const gerardName = getCleanFirstName(familyNames.child) || 'Gerard';
+
   const handleLockIn = (slot: FreeSlot) => {
     // Trigger celebratory confetti
     confetti({
@@ -32,10 +47,13 @@ export const FreeTimingsView: React.FC<Props> = ({
     onAddFreeSlotToCalendar(slot);
   };
 
-  const filteredSlots = freeSlots.filter((slot) => {
+  const filteredSlots = availableFreeSlots.filter((slot) => {
     if (filterType === 'all') return true;
     return slot.type === filterType;
   });
+
+  const coupleCount = availableFreeSlots.filter((s) => s.type === 'couple_date').length;
+  const familyCount = availableFreeSlots.filter((s) => s.type === 'quality_family').length;
 
   return (
     <div className="space-y-6">
@@ -48,20 +66,20 @@ export const FreeTimingsView: React.FC<Props> = ({
               <Sparkles className="w-4 h-4" />
               <span>Smart Free Time & Overlap Finder</span>
             </div>
-            <h2 className="text-xl font-black">Available Free Timings & Date Night Matcher</h2>
+            <h2 className="text-xl font-black">Available Free Timings (Couple Dates & Family Time)</h2>
             <p className="text-xs text-emerald-100 max-w-2xl mt-1">
-              Automatically calculated overlap windows where hospital doctor on-call shifts are clear, lawyer late night calls are quiet, and {familyNames.child.split(' ')[0]} is resting or at nursery.
+              Automatically calculated overlap windows where {surenName}&apos;s hospital shifts are clear, {nicoleName}&apos;s late night calls are quiet, and 2yo {gerardName} is resting or at nursery.
             </p>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
             <div className="bg-white/10 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/15 text-center">
-              <div className="text-lg font-black text-emerald-300">{freeSlots.length}</div>
+              <div className="text-lg font-black text-emerald-300">{availableFreeSlots.length}</div>
               <div className="text-[10px] text-slate-200 uppercase tracking-wide">Free Windows</div>
             </div>
             <div className="bg-white/10 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/15 text-center">
               <div className="text-lg font-black text-rose-300">
-                {freeSlots.filter((s) => s.type === 'couple_date').length}
+                {coupleCount}
               </div>
               <div className="text-[10px] text-slate-200 uppercase tracking-wide">Date Nights</div>
             </div>
@@ -79,7 +97,7 @@ export const FreeTimingsView: React.FC<Props> = ({
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
           }`}
         >
-          All Free Timings ({freeSlots.length})
+          All Free Timings ({availableFreeSlots.length})
         </button>
 
         <button
@@ -91,7 +109,7 @@ export const FreeTimingsView: React.FC<Props> = ({
           }`}
         >
           <Heart className="w-3.5 h-3.5" />
-          <span>💖 Couple Date Nights ({freeSlots.filter((s) => s.type === 'couple_date').length})</span>
+          <span>💖 Couple Date Nights ({surenName} &amp; {nicoleName}) ({coupleCount})</span>
         </button>
 
         <button
@@ -103,31 +121,7 @@ export const FreeTimingsView: React.FC<Props> = ({
           }`}
         >
           <Sun className="w-3.5 h-3.5" />
-          <span>👨‍👩‍👦 Quality Family Outings ({freeSlots.filter((s) => s.type === 'quality_family').length})</span>
-        </button>
-
-        <button
-          onClick={() => setFilterType('doctor_solo_rest')}
-          className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
-            filterType === 'doctor_solo_rest'
-              ? 'bg-sky-600 text-white shadow-sm'
-              : 'bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100'
-          }`}
-        >
-          <Bed className="w-3.5 h-3.5" />
-          <span>🩺 Doctor Post-Call Sleep ({freeSlots.filter((s) => s.type === 'doctor_solo_rest').length})</span>
-        </button>
-
-        <button
-          onClick={() => setFilterType('lawyer_solo_rest')}
-          className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
-            filterType === 'lawyer_solo_rest'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
-          }`}
-        >
-          <Zap className="w-3.5 h-3.5" />
-          <span>⚖️ Lawyer Solo Recharge ({freeSlots.filter((s) => s.type === 'lawyer_solo_rest').length})</span>
+          <span>👨‍👩‍👦 Quality Family Outings ({surenName}, {nicoleName} &amp; {gerardName}) ({familyCount})</span>
         </button>
       </div>
 

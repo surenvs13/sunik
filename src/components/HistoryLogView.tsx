@@ -129,7 +129,7 @@ export const HistoryLogView: React.FC<Props> = ({
               </span>
             </div>
             <p className="text-xs text-indigo-200 mt-0.5">
-              Track, inspect, or undo any added, cancelled, or modified roster events for {familyNames.husband}, {familyNames.wife.split(' ')[0]} &amp; {familyNames.child.split(' ')[0]}
+              Track, inspect, or undo any added, cancelled, or modified roster events for {familyNames.husband}, {familyNames.wife} &amp; {familyNames.child}
             </p>
           </div>
         </div>

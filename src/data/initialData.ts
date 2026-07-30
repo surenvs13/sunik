@@ -1,8 +1,8 @@
 import { ScheduleEvent, FreeSlot, ChildcareGap, FamilyNames } from '../types';
 
 export const INITIAL_FAMILY_NAMES: FamilyNames = {
-  husband: 'Dr. Surentheran',
-  wife: 'Nicole (Lawyer)',
+  husband: 'Suren',
+  wife: 'Nicole',
   child: 'Gerard (2yo)'
 };
 
@@ -17,27 +17,27 @@ const getMonthPrefix = () => {
 const prefix = '2026-08'; // Fixed clean date anchor for consistent demo
 
 export const INITIAL_EVENTS: ScheduleEvent[] = [
-  // --- DOCTOR HUSBAND (SURENTHERAN) ROSTER ---
+  // --- DOCTOR HUSBAND (SUREN) ROSTER ---
   {
     id: 'doc-1',
-    title: '24h Hospital On-Call Shift',
-    person: 'Dr. Surentheran',
+    title: 'Hospital On-Call Duty (Until 12 Midnight)',
+    person: 'Suren',
     category: 'On-Call 24h',
     startDate: `${prefix}-03`,
     startTime: '08:00',
-    endDate: `${prefix}-04`,
-    endTime: '08:00',
+    endDate: `${prefix}-03`,
+    endTime: '00:00',
     isCallDuty: true,
-    isNightShift: true,
+    isNightShift: false,
     requiresPostCallRest: true,
     location: 'Central General Hospital - Acute Medical Unit',
-    notes: 'Senior Medical Registrar Lead on duty.',
+    notes: 'Senior Medical Registrar Lead on duty until 12 midnight.',
     source: 'doctor_roster'
   },
   {
     id: 'doc-1-rest',
     title: 'Post-Call Sleep & Recovery',
-    person: 'Dr. Surentheran',
+    person: 'Suren',
     category: 'Post-Call Rest',
     startDate: `${prefix}-04`,
     startTime: '08:30',
@@ -45,13 +45,13 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
     endTime: '16:00',
     requiresPostCallRest: true,
     location: 'Home - Master Bedroom',
-    notes: 'Mandatory rest window following 24h hospital shift.',
+    notes: 'Mandatory rest window following on-call duty until midnight.',
     source: 'doctor_roster'
   },
   {
     id: 'doc-2',
     title: 'General Outpatient Clinic & Grand Rounds',
-    person: 'Dr. Surentheran',
+    person: 'Suren',
     category: 'Day Clinic',
     startDate: `${prefix}-05`,
     startTime: '08:00',
@@ -64,7 +64,7 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
   {
     id: 'doc-3',
     title: 'Ward Rounds & Inpatient Consults',
-    person: 'Dr. Surentheran',
+    person: 'Suren',
     category: 'Ward Rounds',
     startDate: `${prefix}-07`,
     startTime: '07:30',
@@ -76,24 +76,24 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
   },
   {
     id: 'doc-4',
-    title: 'Overnight Intensive Care Duty',
-    person: 'Dr. Surentheran',
+    title: 'Overnight Intensive Care Duty (Until 12 Midnight)',
+    person: 'Suren',
     category: 'Night Shift',
     startDate: `${prefix}-10`,
     startTime: '21:00',
-    endDate: `${prefix}-11`,
-    endTime: '08:30',
+    endDate: `${prefix}-10`,
+    endTime: '00:00',
     isCallDuty: true,
-    isNightShift: true,
+    isNightShift: false,
     requiresPostCallRest: true,
     location: 'ICU Unit 2',
-    notes: 'Covering acute respiratory cases.',
+    notes: 'Covering acute respiratory cases until 12 midnight.',
     source: 'doctor_roster'
   },
   {
     id: 'doc-4-rest',
     title: 'Post-Night Shift Rest',
-    person: 'Dr. Surentheran',
+    person: 'Suren',
     category: 'Post-Call Rest',
     startDate: `${prefix}-11`,
     startTime: '09:00',
@@ -106,24 +106,38 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
   },
   {
     id: 'doc-5',
-    title: '24h On-Call Weekend Shift',
-    person: 'Dr. Surentheran',
+    title: 'On-Call Weekend Shift (Until 12 Midnight)',
+    person: 'Suren',
     category: 'On-Call 24h',
     startDate: `${prefix}-15`,
     startTime: '08:00',
-    endDate: `${prefix}-16`,
-    endTime: '08:00',
+    endDate: `${prefix}-15`,
+    endTime: '00:00',
     isCallDuty: true,
-    isNightShift: true,
+    isNightShift: false,
     requiresPostCallRest: true,
     location: 'Acute Medical Unit',
-    notes: 'Weekend inpatient hospital duty.',
+    notes: 'Weekend inpatient hospital duty until 12 midnight.',
+    source: 'doctor_roster'
+  },
+  {
+    id: 'doc-5-rest',
+    title: 'Post-Call Sleep & Recovery',
+    person: 'Suren',
+    category: 'Post-Call Rest',
+    startDate: `${prefix}-16`,
+    startTime: '08:30',
+    endDate: `${prefix}-16`,
+    endTime: '15:00',
+    requiresPostCallRest: true,
+    location: 'Home - Master Bedroom',
+    notes: 'Mandatory sleep & fatigue recovery following weekend shift.',
     source: 'doctor_roster'
   },
   {
     id: 'doc-6',
     title: 'Surgical Day Theater & Ward Cover',
-    person: 'Dr. Surentheran',
+    person: 'Suren',
     category: 'Day Clinic',
     startDate: `${prefix}-19`,
     startTime: '08:00',
@@ -135,26 +149,40 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
   },
   {
     id: 'doc-7',
-    title: '24h Hospital On-Call Duty',
-    person: 'Dr. Surentheran',
+    title: 'Hospital On-Call Duty (Until 12 Midnight)',
+    person: 'Suren',
     category: 'On-Call 24h',
     startDate: `${prefix}-23`,
     startTime: '08:00',
-    endDate: `${prefix}-24`,
-    endTime: '08:00',
+    endDate: `${prefix}-23`,
+    endTime: '00:00',
     isCallDuty: true,
-    isNightShift: true,
+    isNightShift: false,
     requiresPostCallRest: true,
     location: 'Acute Medical Unit',
-    notes: 'Covering senior registrar calls.',
+    notes: 'Covering senior registrar calls until 12 midnight.',
+    source: 'doctor_roster'
+  },
+  {
+    id: 'doc-7-rest',
+    title: 'Post-Call Sleep & Recovery',
+    person: 'Suren',
+    category: 'Post-Call Rest',
+    startDate: `${prefix}-24`,
+    startTime: '08:30',
+    endDate: `${prefix}-24`,
+    endTime: '16:00',
+    requiresPostCallRest: true,
+    location: 'Home - Master Bedroom',
+    notes: 'Mandatory sleep recovery following hospital on-call duty.',
     source: 'doctor_roster'
   },
 
-  // --- LAWYER WIFE (NICOLE) SCHEDULE ---
+  // --- NICOLE SCHEDULE ---
   {
     id: 'wife-1',
     title: 'High Court Trial Opening - Commercial Dispute',
-    person: 'Nicole (Lawyer)',
+    person: 'Nicole',
     category: 'Court Hearing',
     startDate: `${prefix}-03`,
     startTime: '09:00',
@@ -167,7 +195,7 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
   {
     id: 'wife-2',
     title: 'Urgent Cross-Border Acquisition Conference Call',
-    person: 'Nicole (Lawyer)',
+    person: 'Nicole',
     category: 'Late Night Call',
     startDate: `${prefix}-03`,
     startTime: '21:30',
@@ -181,7 +209,7 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
   {
     id: 'wife-3',
     title: 'Late Night Client Negotiations',
-    person: 'Nicole (Lawyer)',
+    person: 'Nicole',
     category: 'Late Night Call',
     startDate: `${prefix}-06`,
     startTime: '20:30',
@@ -195,7 +223,7 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
   {
     id: 'wife-4',
     title: 'Firm Partner Dinner & Client Retention',
-    person: 'Nicole (Lawyer)',
+    person: 'Nicole',
     category: 'Client Briefing',
     startDate: `${prefix}-10`,
     startTime: '19:00',
@@ -208,7 +236,7 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
   {
     id: 'wife-5',
     title: 'Arbitration Deposition Session',
-    person: 'Nicole (Lawyer)',
+    person: 'Nicole',
     category: 'Court Hearing',
     startDate: `${prefix}-14`,
     startTime: '10:00',
@@ -221,7 +249,7 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
   {
     id: 'wife-6',
     title: 'Late Night European Law Briefing',
-    person: 'Nicole (Lawyer)',
+    person: 'Nicole',
     category: 'Late Night Call',
     startDate: `${prefix}-18`,
     startTime: '21:00',
@@ -285,7 +313,7 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
     endDate: `${prefix}-08`,
     endTime: '18:00',
     location: 'Botanical Gardens Playground',
-    notes: 'Quality time for Dr. Surentheran & Nicole + 2yo Gerard!',
+    notes: 'Quality time for Suren & Nicole + 2yo Gerard!',
     source: 'manual'
   },
   {
@@ -298,7 +326,7 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
     endDate: `${prefix}-04`,
     endTime: '21:30',
     location: 'Trattoria Bella Vista',
-    notes: 'Post-Call Evening Date Night! Dr. Surentheran finished daytime sleep recovery at 16:00 and is fully refreshed.',
+    notes: 'Post-Call Evening Date Night! Suren finished daytime sleep recovery at 16:00 and is fully refreshed.',
     source: 'ai_suggested'
   },
   {
@@ -324,7 +352,7 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
     endDate: `${prefix}-24`,
     endTime: '21:30',
     location: 'Rooftop Horizon Lounge',
-    notes: 'Post-Call Evening Date Night! Dr. Surentheran fully rested after post-call sleep. Nicole free.',
+    notes: 'Post-Call Evening Date Night! Suren fully rested after post-call sleep. Nicole free.',
     source: 'ai_suggested'
   },
   {
@@ -337,7 +365,7 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
     endDate: `${prefix}-22`,
     endTime: '14:30',
     location: 'City Zoo & Picnic Park',
-    notes: 'Both Dr. Surentheran & Nicole completely off duty!',
+    notes: 'Both Suren & Nicole completely off duty!',
     source: 'manual'
   },
   {
@@ -352,10 +380,47 @@ export const INITIAL_EVENTS: ScheduleEvent[] = [
     location: 'Sunny Cove Beach & Playground',
     notes: 'Suren post-call sleep completed at 15:00. Family beach time with Suren, Nicole & 2yo Gerard!',
     source: 'ai_suggested'
+  },
+  {
+    id: 'church-1',
+    title: 'Sunday Holy Mass & Church Service',
+    person: 'Family',
+    category: 'Church/Catechism',
+    startDate: `${prefix}-02`,
+    startTime: '09:00',
+    endDate: `${prefix}-02`,
+    endTime: '10:30',
+    location: 'St. Mary Cathedral',
+    notes: 'Weekly family Sunday church worship.',
+    source: 'manual'
+  },
+  {
+    id: 'catechism-1',
+    title: 'Children Catechism & Sunday School Class',
+    person: 'Gerard (2yo)',
+    category: 'Church/Catechism',
+    startDate: `${prefix}-09`,
+    startTime: '10:30',
+    endDate: `${prefix}-09`,
+    endTime: '11:45',
+    location: 'Church Parish Hall',
+    notes: 'Toddlers faith formation and catechism session.',
+    source: 'manual'
   }
 ];
 
 export const INITIAL_FREE_SLOTS: FreeSlot[] = [
+  {
+    id: 'free-0',
+    title: 'Family Time: Sunday Family Brunch & Playground Outing',
+    type: 'quality_family',
+    date: `${prefix}-02`,
+    startTime: '10:30',
+    endTime: '14:00',
+    durationHours: 3.5,
+    reason: 'Sunday Off-Duty Golden Window! Zero hospital call shifts or legal briefs for Suren and Nicole. Great post-church outing with 2yo Gerard.',
+    score: 9.8
+  },
   {
     id: 'free-1',
     title: 'Date Night #1: Post-Call Evening Italian Dinner',
@@ -364,7 +429,7 @@ export const INITIAL_FREE_SLOTS: FreeSlot[] = [
     startTime: '18:30',
     endTime: '21:30',
     durationHours: 3.0,
-    reason: 'Dr. Surentheran completed daytime post-call sleep at 16:00 and is fully energized for the evening! Nicole has no calls, Gerard in bed by 19:30.',
+    reason: 'Suren completed daytime post-call sleep at 16:00 and is fully energized for the evening! Nicole has no calls, Gerard in bed by 19:30.',
     score: 9.9
   },
   {
@@ -375,7 +440,7 @@ export const INITIAL_FREE_SLOTS: FreeSlot[] = [
     startTime: '19:45',
     endTime: '22:30',
     durationHours: 2.75,
-    reason: 'Gerard asleep by 19:30. Zero hospital duty or international lawyer calls for Suren & Nicole.',
+    reason: 'Gerard asleep by 19:30. Zero hospital duty or international calls for Suren & Nicole.',
     score: 9.7
   },
   {
@@ -386,7 +451,7 @@ export const INITIAL_FREE_SLOTS: FreeSlot[] = [
     startTime: '18:30',
     endTime: '21:30',
     durationHours: 3.0,
-    reason: 'Post-call evening window! Dr. Surentheran well rested after daytime recovery. Nicole off duty.',
+    reason: 'Post-call evening window! Suren well rested after daytime recovery. Nicole off duty.',
     score: 9.8
   },
   {
@@ -397,7 +462,7 @@ export const INITIAL_FREE_SLOTS: FreeSlot[] = [
     startTime: '15:30',
     endTime: '18:00',
     durationHours: 2.5,
-    reason: 'Dr. Surentheran has no hospital duty, Nicole has no court or calls, Gerard is awake and energetic! Perfect outdoor park time.',
+    reason: 'Suren has no hospital duty, Nicole has no court or calls, Gerard is awake and energetic! Perfect outdoor park time.',
     score: 9.8
   },
   {
@@ -408,7 +473,7 @@ export const INITIAL_FREE_SLOTS: FreeSlot[] = [
     startTime: '15:30',
     endTime: '18:30',
     durationHours: 3.0,
-    reason: 'Dr. Surentheran post-call sleep finishes at 15:00. Great afternoon window for Suren, Nicole & 2yo Gerard at the beach!',
+    reason: 'Suren post-call sleep finishes at 15:00. Great afternoon window for Suren, Nicole & 2yo Gerard at the beach!',
     score: 9.8
   },
   {
@@ -421,28 +486,6 @@ export const INITIAL_FREE_SLOTS: FreeSlot[] = [
     durationHours: 4.5,
     reason: 'Golden weekend window! Zero calls or hospital duties for both parents all day. Great outing with 2yo Gerard.',
     score: 9.9
-  },
-  {
-    id: 'free-7',
-    title: 'Doctor Deep Rest & Recovery Window',
-    type: 'doctor_solo_rest',
-    date: `${prefix}-04`,
-    startTime: '08:30',
-    endTime: '16:00',
-    durationHours: 7.5,
-    reason: 'Essential daytime sleep following 24h Hospital On-Call shift. Daytime post-call rest leaves evening free for date night!',
-    score: 10.0
-  },
-  {
-    id: 'free-8',
-    title: 'Lawyer Nicole Spa / Solo Wellness Time',
-    type: 'lawyer_solo_rest',
-    date: `${prefix}-09`,
-    startTime: '10:00',
-    endTime: '13:00',
-    durationHours: 3.0,
-    reason: 'Dr. Surentheran is off-duty taking Gerard to the park. Nicole has a quiet 3-hour recharge window.',
-    score: 9.2
   }
 ];
 
@@ -452,7 +495,7 @@ export const INITIAL_CHILDCARE_GAPS: ChildcareGap[] = [
     date: `${prefix}-03`,
     startTime: '21:30',
     endTime: '23:30',
-    conflictReason: 'CRITICAL OVERLAP: Dr. Surentheran is on 24h Hospital On-Call duty at Acute Unit & Lawyer Nicole has an urgent 2h Cross-Border Legal Call at home.',
+    conflictReason: 'CRITICAL OVERLAP: Suren is on 24h Hospital On-Call duty at Acute Unit & Nicole has an urgent 2h Cross-Border Legal Call at home.',
     recommendedSolution: 'Ensure Night Nanny/Grandmother is present at home to respond if 2yo Gerard wakes up during the late call.'
   },
   {
@@ -460,15 +503,16 @@ export const INITIAL_CHILDCARE_GAPS: ChildcareGap[] = [
     date: `${prefix}-10`,
     startTime: '21:00',
     endTime: '22:00',
-    conflictReason: 'Dr. Surentheran starts ICU Night Shift at 21:00 & Nicole is at Firm Partner Client Dinner downtown until 22:00.',
+    conflictReason: 'Suren starts ICU Night Shift at 21:00 & Nicole is at Firm Partner Client Dinner downtown until 22:00.',
     recommendedSolution: 'Babysitter coverage required from 20:30 to 22:30 at home.'
   }
 ];
 
 export const SAMPLE_HOSPITAL_ROSTER_TEXT = `
 CENTRAL GENERAL HOSPITAL - DEPARTMENT OF MEDICINE
-ROSTER FOR DR. SURENTHERAN (SENIOR REGISTRAR) - AUGUST 2026
+ROSTER FOR SUREN (SENIOR REGISTRAR) - AUGUST 2026
 
+Aug 2 (Sun): OFF DUTY / SUNDAY HOLY MASS & FAMILY BRUNCH
 Aug 3 (Mon): 08:00 - 24H ACUTE MEDICAL ON-CALL
 Aug 4 (Tue): POST-CALL MANDATORY REST
 Aug 5 (Wed): 08:00 - 17:00 OUTPATIENT CLINIC & INTERN ROUNDS
@@ -483,7 +527,8 @@ Aug 24 (Mon): POST-CALL REST
 `;
 
 export const SAMPLE_WHATSAPP_CHAT_TEXT = `
-[01/08/2026, 08:15] Nicole (Lawyer): Morning dear! Here is my legal schedule & Gerard's items for August:
+[01/08/2026, 08:15] Nicole: Morning dear! Here is my legal schedule & Gerard's items for August:
+- Sun Aug 2: Sunday Holy Mass & Church Service 9:00am-10:30am + Family Sunday Brunch 10:30am-2:00pm.
 - Aug 3: High Court commercial trial 9am-4:30pm + Late night Zoom call with London legal team 9:30pm-11:30pm.
 - Aug 10 to Aug 14 (Mon-Fri): High Court International Arbitration Trial from 9am to 4:30pm every day!
 - Aug 18, 19, and 20: Late night European compliance client calls 9pm-11pm each night.
@@ -492,6 +537,6 @@ export const SAMPLE_WHATSAPP_CHAT_TEXT = `
 - Sat Aug 8: Gerard Little Gym playgroup at 10am + Family park outing at 3:30pm.
 - Wed Aug 12: Date Night Japanese Omakase after Gerard's 7:30pm bedtime!
 
-[01/08/2026, 08:22] Dr. Surentheran: Thanks honey! Adding my 24h hospital call duties for August too:
+[01/08/2026, 08:22] Suren: Thanks honey! Adding my 24h hospital call duties for August too:
 - I'm on 24h hospital on-call duty on Aug 3, Aug 15, and Aug 23!
 `;

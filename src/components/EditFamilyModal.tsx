@@ -24,16 +24,16 @@ export const EditFamilyModal: React.FC<Props> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSaveFamilyNames({
-      husband: husband.trim() || 'Dr. Surentheran',
-      wife: wife.trim() || 'Nicole (Lawyer)',
+      husband: husband.trim() || 'Suren',
+      wife: wife.trim() || 'Nicole',
       child: child.trim() || 'Gerard (2yo)'
     });
     onClose();
   };
 
   const handleReset = () => {
-    setHusband('Dr. Surentheran');
-    setWife('Nicole (Lawyer)');
+    setHusband('Suren');
+    setWife('Nicole');
     setChild('Gerard (2yo)');
   };
 
@@ -63,34 +63,34 @@ export const EditFamilyModal: React.FC<Props> = ({
           <div>
             <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
               <User className="w-4 h-4 text-red-600" />
-              <span>Husband (Hospital Doctor) Name</span>
+              <span>Suren (Hospital Doctor) Name</span>
             </label>
             <input
               type="text"
               value={husband}
               onChange={(e) => setHusband(e.target.value)}
-              placeholder="e.g. Dr. Surentheran"
+              placeholder="e.g. Suren"
               required
               className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 bg-slate-50/50"
             />
-            <p className="text-[11px] text-slate-400 mt-0.5">Used for hospital call rosters & duty shifts</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Used for hospital call rosters &amp; duty shifts</p>
           </div>
 
           {/* Wife Name */}
           <div>
             <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
               <Heart className="w-4 h-4 text-blue-600" />
-              <span>Wife (Lawyer) Name</span>
+              <span>Nicole Name</span>
             </label>
             <input
               type="text"
               value={wife}
               onChange={(e) => setWife(e.target.value)}
-              placeholder="e.g. Nicole (Lawyer)"
+              placeholder="e.g. Nicole"
               required
               className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
             />
-            <p className="text-[11px] text-slate-400 mt-0.5">Used for court hearings & late night calls</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Used for court hearings &amp; late night calls</p>
           </div>
 
           {/* Child Name */}

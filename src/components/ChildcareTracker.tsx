@@ -9,10 +9,10 @@ interface Props {
 }
 
 export const ChildcareTracker: React.FC<Props> = ({ childcareGaps, events, familyNames }) => {
-  const childShortName = familyNames.child.split(' ')[0];
+  const childShortName = familyNames.child.replace(/^(Dr\.|Mrs\.|Mr\.|Ms\.|Lawyer)\s+/i, '').split(' ')[0] || familyNames.child;
 
   // Extract all events involving child
-  const childEvents = events.filter((e) => e.person === familyNames.child || e.person === 'Noah (2yo)' || e.category === 'Nursery/Daycare');
+  const childEvents = events.filter((e) => e.person === familyNames.child || e.person.toLowerCase().includes('gerard') || e.category === 'Nursery/Daycare');
 
   return (
     <div className="space-y-6">

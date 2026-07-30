@@ -14,13 +14,16 @@ import {
   X,
   Sparkles,
   Filter,
-  Stethoscope,
   MessageSquare,
   Loader2,
   CheckCircle2,
   Undo2,
   Heart,
-  Sun
+  Sun,
+  Search,
+  ShieldAlert,
+  RotateCw,
+  Edit3
 } from 'lucide-react';
 
 interface Props {
@@ -28,10 +31,13 @@ interface Props {
   onAddEvent: (event: ScheduleEvent) => void;
   onAddEvents?: (events: ScheduleEvent[]) => void;
   onDeleteEvent: (id: string) => void;
+  onDeleteAllEvents?: () => void;
+  onCancelMonthCallDuties?: (year: number, month: number) => number | void;
   onOpenAddModal: (date?: string, category?: EventCategory) => void;
   onOpenWhatsAppModal?: () => void;
   onEditEvent: (event: ScheduleEvent) => void;
   familyNames: FamilyNames;
+  onOpenEditNames?: () => void;
   canUndo?: boolean;
   onUndo?: () => void;
 }
@@ -41,10 +47,13 @@ export const CalendarView: React.FC<Props> = ({
   onAddEvent,
   onAddEvents,
   onDeleteEvent,
+  onDeleteAllEvents,
+  onCancelMonthCallDuties,
   onOpenAddModal,
   onOpenWhatsAppModal,
   onEditEvent,
   familyNames,
+  onOpenEditNames,
   canUndo,
   onUndo
 }) => {
@@ -58,6 +67,9 @@ export const CalendarView: React.FC<Props> = ({
   // Selected Day Detail Modal
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
 
+  // Cancel Month Call Duties Confirmation Modal State
+  const [isCancelCallsModalOpen, setIsCancelCallsModalOpen] = useState(false);
+
   // Main Page Inline WhatsApp Parser state
   const [isParserExpanded, setIsParserExpanded] = useState(false);
   const [quickChatText, setQuickChatText] = useState('');
@@ -65,6 +77,190 @@ export const CalendarView: React.FC<Props> = ({
   const [isQuickParsing, setIsQuickParsing] = useState(false);
   const [quickSuccessMsg, setQuickSuccessMsg] = useState('');
   const [quickErrorMsg, setQuickErrorMsg] = useState('');
+
+  // Monthly List View Search & Quick Category Filter
+  const [monthListSearch, setMonthListSearch] = useState('');
+  const [listCategoryFilter, setListCategoryFilter] = useState<'all' | 'calls' | 'dates' | 'family' | 'husband' | 'wife' | 'child'>('all');
+
+  // Recommendation refresh seed & loading indicator state
+  const [recommendationSeed, setRecommendationSeed] = useState(0);
+  const [isRefreshingRecs, setIsRefreshingRecs] = useState(false);
+
+  const getRecommendedOutings = (
+    allEvents: ScheduleEvent[],
+    monthPrefix: string,
+    seed: number
+  ) => {
+    const [yStr, mStr] = monthPrefix.split('-');
+    const year = parseInt(yStr, 10) || 2026;
+    const month = (parseInt(mStr, 10) || 8) - 1;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const postCallDates: string[] = [];
+    const freeDates: string[] = [];
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${monthPrefix}-${String(d).padStart(2, '0')}`;
+      const dayEvents = allEvents.filter(
+        (e) => e.startDate === dateStr || e.endDate === dateStr
+      );
+
+      const hasCallDuty = dayEvents.some(
+        (e) =>
+          e.isCallDuty ||
+          e.category === 'On-Call 24h' ||
+          e.category === 'Night Shift'
+      );
+      const hasPostCallRest = dayEvents.some(
+        (e) => e.category === 'Post-Call Rest' || e.requiresPostCallRest
+      );
+
+      if (hasPostCallRest) {
+        postCallDates.push(dateStr);
+      } else if (!hasCallDuty) {
+        freeDates.push(dateStr);
+      }
+    }
+
+    const dateNightIdeas = [
+      {
+        title: 'Post-Call Evening Dinner',
+        time: '18:30 - 21:30',
+        note: `Post-Call Evening! ${familyNames.husband} completed daytime sleep recovery at 16:00 and is fully refreshed.`
+      },
+      {
+        title: 'Japanese Omakase Night',
+        time: '19:45 - 22:00',
+        note: `${familyNames.child} asleep at home with Nanny Maya! Zero hospital or lawyer calls scheduled.`
+      },
+      {
+        title: 'Post-Call Sunset Cocktails',
+        time: '18:30 - 21:30',
+        note: `Post-Call Evening! ${familyNames.husband} fully rested after post-call sleep recovery.`
+      },
+      {
+        title: 'Lakeside Italian Candlelight Dinner',
+        time: '19:00 - 21:30',
+        note: `Relaxing couple dinner window! Quiet evening for ${familyNames.husband} & ${familyNames.wife}.`
+      },
+      {
+        title: 'Rooftop Lounge & Bistro',
+        time: '19:30 - 22:00',
+        note: `Evening free of hospital calls! Enjoy rooftop city views and quiet conversation.`
+      },
+      {
+        title: 'Seafood Fine Dining & Wine Bar',
+        time: '18:30 - 21:00',
+        note: `Both parents free in the evening! ${familyNames.child} cared for by Nanny Maya.`
+      }
+    ];
+
+    const familyIdeas = [
+      {
+        title: 'Botanical Gardens & Ice Cream',
+        time: '15:30 - 18:00',
+        note: `${familyNames.husband} & ${familyNames.wife} both free! Playground & ice cream with 2yo ${familyNames.child}.`
+      },
+      {
+        title: 'Post-Call Sunday Beach & Splash Park',
+        time: '15:30 - 18:30',
+        note: `${familyNames.husband}'s post-call sleep completes at 15:00. Afternoon beach outing with ${familyNames.husband}, ${familyNames.wife} & ${familyNames.child}!`
+      },
+      {
+        title: 'Sunday City Zoo & Picnic Day',
+        time: '10:00 - 14:30',
+        note: `Golden weekend window! Zero calls or hospital duty for both parents all day.`
+      },
+      {
+        title: 'Lakeside Park Bicycle & Playground Day',
+        time: '16:00 - 18:30',
+        note: `Family outdoor time! Toddler playground fun with ${familyNames.child} before dinner.`
+      },
+      {
+        title: 'Children Science Centre & Interactive Fun',
+        time: '10:30 - 13:30',
+        note: `Interactive sensory play day for ${familyNames.child} with Mom & Dad!`
+      },
+      {
+        title: 'Family Weekend Farmers Market & Brunch',
+        time: '09:30 - 12:00',
+        note: `Sunny weekend morning family stroll and fresh breakfast together.`
+      }
+    ];
+
+    const combinedCandidates = [...postCallDates, ...freeDates];
+    if (combinedCandidates.length === 0) {
+      for (let d = 1; d <= 28; d++) {
+        combinedCandidates.push(`${monthPrefix}-${String(d).padStart(2, '0')}`);
+      }
+    }
+
+    const dateNightCandidates: string[] = [];
+    for (let i = 0; i < combinedCandidates.length && dateNightCandidates.length < 3; i++) {
+      const idx = (i + seed) % combinedCandidates.length;
+      const d = combinedCandidates[idx];
+      if (!dateNightCandidates.includes(d)) {
+        dateNightCandidates.push(d);
+      }
+    }
+    while (dateNightCandidates.length < 3) {
+      const fallbackDay = String((dateNightCandidates.length + 1) * 7).padStart(2, '0');
+      dateNightCandidates.push(`${monthPrefix}-${fallbackDay}`);
+    }
+
+    const familyCandidates: string[] = [];
+    for (let i = 0; i < combinedCandidates.length && familyCandidates.length < 3; i++) {
+      const idx = (i + seed + 2) % combinedCandidates.length;
+      const d = combinedCandidates[idx];
+      if (!familyCandidates.includes(d) && (!dateNightCandidates.includes(d) || combinedCandidates.length < 6)) {
+        familyCandidates.push(d);
+      }
+    }
+    while (familyCandidates.length < 3) {
+      const fallbackDay = String((familyCandidates.length + 1) * 6).padStart(2, '0');
+      familyCandidates.push(`${monthPrefix}-${fallbackDay}`);
+    }
+
+    const dateNightRecs = dateNightCandidates.map((date, idx) => {
+      const ideaIndex = (idx + seed) % dateNightIdeas.length;
+      const idea = dateNightIdeas[ideaIndex];
+      const isPostCall = postCallDates.includes(date);
+      const customTitle = `Date Night #${idx + 1}: ${idea.title}`;
+      const customNote = isPostCall
+        ? `${familyNames.husband} finishes Post-Call Rest at 16:00. Refreshed for evening dinner with ${familyNames.wife}!`
+        : idea.note;
+
+      return {
+        id: `rec-date-${monthPrefix}-${idx}-${seed}`,
+        title: customTitle,
+        date,
+        time: idea.time,
+        note: customNote,
+        category: 'Date Night' as EventCategory
+      };
+    });
+
+    const familyRecs = familyCandidates.map((date, idx) => {
+      const ideaIndex = (idx + seed) % familyIdeas.length;
+      const idea = familyIdeas[ideaIndex];
+      const isPostCall = postCallDates.includes(date);
+      const customTitle = `Family Time #${idx + 1}: ${idea.title}`;
+      const customNote = isPostCall
+        ? `${familyNames.husband}'s post-call sleep completes by 15:00. Great afternoon family outing with ${familyNames.child}!`
+        : idea.note;
+
+      return {
+        id: `rec-fam-${monthPrefix}-${idx}-${seed}`,
+        title: customTitle,
+        date,
+        time: idea.time,
+        note: customNote,
+        category: 'Family Outing' as EventCategory
+      };
+    });
+
+    return { dateNightRecs, familyRecs };
+  };
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -183,6 +379,68 @@ export const CalendarView: React.FC<Props> = ({
     return e.person === selectedPerson;
   });
 
+  // Calculate Call Duties in the current month (for bulk cancel)
+  const monthCallDuties = events.filter((e) => {
+    const isCallCategory =
+      e.category === 'On-Call 24h' ||
+      e.category === 'Night Shift' ||
+      e.isCallDuty === true ||
+      e.category === 'Post-Call Rest' ||
+      e.requiresPostCallRest === true;
+
+    const matchesMonth =
+      (e.startDate && e.startDate.startsWith(monthString)) ||
+      (e.endDate && e.endDate.startsWith(monthString));
+
+    return matchesMonth && isCallCategory;
+  });
+
+  // Filter & group events for the list view below the monthly calendar grid
+  const currentMonthEvents = filteredEvents
+    .filter((e) => {
+      const end = e.endDate || e.startDate;
+      const isSearchMatch = !monthListSearch.trim() || 
+        (e.title || '').toLowerCase().includes(monthListSearch.toLowerCase()) ||
+        (e.person || '').toLowerCase().includes(monthListSearch.toLowerCase()) ||
+        (e.category || '').toLowerCase().includes(monthListSearch.toLowerCase()) ||
+        (e.location || '').toLowerCase().includes(monthListSearch.toLowerCase()) ||
+        (e.notes || '').toLowerCase().includes(monthListSearch.toLowerCase());
+
+      const isCurrentMonth = e.startDate.startsWith(monthString) || 
+        (e.endDate && e.endDate.startsWith(monthString)) || 
+        (monthString >= e.startDate.slice(0, 7) && monthString <= end.slice(0, 7));
+
+      let isCategoryMatch = true;
+      if (listCategoryFilter === 'calls') {
+        isCategoryMatch = Boolean(e.isCallDuty) || e.category === 'On-Call 24h' || e.category === 'Night Shift' || e.category === 'Post-Call Rest' || Boolean(e.requiresPostCallRest);
+      } else if (listCategoryFilter === 'dates') {
+        isCategoryMatch = e.category === 'Date Night';
+      } else if (listCategoryFilter === 'family') {
+        isCategoryMatch = e.category === 'Family Outing' || e.person === 'Family';
+      } else if (listCategoryFilter === 'husband') {
+        isCategoryMatch = (e.person || '').toLowerCase().includes('suren') || e.person === familyNames.husband;
+      } else if (listCategoryFilter === 'wife') {
+        isCategoryMatch = (e.person || '').toLowerCase().includes('nicole') || e.person === familyNames.wife;
+      } else if (listCategoryFilter === 'child') {
+        isCategoryMatch = (e.person || '').toLowerCase().includes('gerard') || e.person === familyNames.child;
+      }
+
+      return isCurrentMonth && isSearchMatch && isCategoryMatch;
+    })
+    .sort((a, b) => {
+      if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
+      return (a.startTime || '').localeCompare(b.startTime || '');
+    });
+
+  const monthEventsByDate = currentMonthEvents.reduce((acc, event) => {
+    const dateKey = event.startDate;
+    if (!acc[dateKey]) acc[dateKey] = [];
+    acc[dateKey].push(event);
+    return acc;
+  }, {} as Record<string, ScheduleEvent[]>);
+
+  const sortedMonthDates = Object.keys(monthEventsByDate).sort();
+
   // Calculate calendar grid for selected month
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
@@ -220,6 +478,23 @@ export const CalendarView: React.FC<Props> = ({
 
   // Helper badge color
   const getBadgeStyle = (event: ScheduleEvent) => {
+    const titleLower = (event.title || '').toLowerCase();
+    const categoryLower = (event.category || '').toLowerCase();
+    const notesLower = (event.notes || '').toLowerCase();
+
+    // All Church & Catechism activities coloured in grey as requested
+    if (
+      event.category === 'Church/Catechism' ||
+      categoryLower.includes('church') ||
+      categoryLower.includes('catechism') ||
+      titleLower.includes('church') ||
+      titleLower.includes('catechism') ||
+      notesLower.includes('church') ||
+      notesLower.includes('catechism')
+    ) {
+      return 'bg-gray-200 text-gray-800 border-gray-400 font-semibold';
+    }
+
     const personLower = (event.person || '').toLowerCase();
 
     // Suren (Red theme as requested)
@@ -449,6 +724,17 @@ export const CalendarView: React.FC<Props> = ({
           >
             <span>👨‍👩‍👦 Joint Family</span>
           </button>
+
+          {onOpenEditNames && (
+            <button
+              onClick={onOpenEditNames}
+              className="px-3 py-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-sky-50 hover:border-sky-300 border border-slate-300 rounded-lg transition-all flex items-center gap-1.5 shadow-2xs ml-auto sm:ml-2 cursor-pointer"
+              title="Edit Family Member Names"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-sky-600" />
+              <span>Edit Member Names</span>
+            </button>
+          )}
         </div>
 
         {/* Add Event Action Buttons */}
@@ -467,21 +753,34 @@ export const CalendarView: React.FC<Props> = ({
           </button>
 
           <button
-            onClick={() => onOpenAddModal(undefined, 'On-Call 24h')}
-            className="px-3.5 py-2 text-xs font-black text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5"
-            title="Add a 24-Hour Doctor On-Call Duty"
-          >
-            <Stethoscope className="w-4 h-4" />
-            <span>Add 24h Call</span>
-          </button>
-
-          <button
             onClick={() => onOpenAddModal()}
             className="px-3.5 py-2 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
             <span>Add Custom Event</span>
           </button>
+
+          {onCancelMonthCallDuties && monthCallDuties.length > 0 && (
+            <button
+              onClick={() => setIsCancelCallsModalOpen(true)}
+              className="px-3.5 py-2 text-xs font-black text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 border border-red-200"
+              title={`Cancel all ${monthCallDuties.length} on-call duty shifts & post-call rest for ${monthNames[currentMonth]} ${currentYear}`}
+            >
+              <ShieldAlert className="w-4 h-4 text-red-600" />
+              <span>Cancel Call Duties ({monthCallDuties.length})</span>
+            </button>
+          )}
+
+          {onDeleteAllEvents && events.length > 0 && (
+            <button
+              onClick={onDeleteAllEvents}
+              className="px-3.5 py-2 text-xs font-black text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 border border-rose-200"
+              title="Delete all events from calendar"
+            >
+              <Trash2 className="w-4 h-4 text-rose-600" />
+              <span>Delete All Events ({events.length})</span>
+            </button>
+          )}
 
           {canUndo && onUndo && (
             <button
@@ -615,204 +914,175 @@ export const CalendarView: React.FC<Props> = ({
       </div>
 
       {/* Main Screen Smart Recommendations Section */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div>
-            <div className="flex items-center gap-2 text-rose-600 font-extrabold text-xs uppercase tracking-wider">
-              <Sparkles className="w-4 h-4" />
-              <span>Recommended Monthly Outings &amp; Date Nights</span>
+      {(() => {
+        const { dateNightRecs, familyRecs } = getRecommendedOutings(events, monthString, recommendationSeed);
+
+        return (
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2 text-rose-600 font-extrabold text-xs uppercase tracking-wider">
+                  <Sparkles className="w-4 h-4" />
+                  <span>Recommended Monthly Outings &amp; Date Nights</span>
+                </div>
+                <h3 className="text-base font-black text-slate-900 mt-0.5">
+                  3 Recommended Date Nights + 3 Family Outings ({monthNames[currentMonth]} {currentYear})
+                </h3>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setIsRefreshingRecs(true);
+                    setRecommendationSeed((prev) => prev + 1);
+                    setTimeout(() => setIsRefreshingRecs(false), 400);
+                  }}
+                  className="px-3.5 py-1.5 text-xs font-black text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/90 rounded-xl transition-all flex items-center gap-1.5 shadow-2xs hover:scale-102 active:scale-98 cursor-pointer"
+                  title={`Recalculate and refresh recommended date nights and family outings for ${monthNames[currentMonth]} ${currentYear}`}
+                >
+                  <RotateCw className={`w-3.5 h-3.5 text-rose-600 ${isRefreshingRecs ? 'animate-spin' : ''}`} />
+                  <span>Refresh Recommendations</span>
+                </button>
+                <span className="text-xs text-slate-500 font-medium bg-slate-100 px-3 py-1 rounded-full hidden md:inline-block">
+                  Auto-calculated from Roster
+                </span>
+              </div>
             </div>
-            <h3 className="text-base font-black text-slate-900 mt-0.5">
-              3 Recommended Date Nights + 3 Family Outings ({monthNames[currentMonth]} {currentYear})
-            </h3>
-          </div>
-          <span className="text-xs text-slate-500 font-medium bg-slate-100 px-3 py-1 rounded-full w-fit">
-            Featuring Suren&apos;s Post-Call Rest Evenings
-          </span>
-        </div>
 
-        {/* 3 Date Night Recommendations */}
-        <div className="space-y-2">
-          <h4 className="text-xs font-black uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
-            <Heart className="w-4 h-4 text-rose-500" />
-            <span>💖 3 Recommended Couple Date Nights (Suren &amp; Nicole)</span>
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {[
-              {
-                id: 'rec-date-1',
-                title: 'Date Night #1: Post-Call Evening Dinner',
-                date: `${monthString}-04`,
-                time: '18:30 - 21:30',
-                note: 'Post-Call Evening! Dr. Surentheran completed daytime sleep recovery at 16:00 and is fully refreshed.',
-                category: 'Date Night' as EventCategory
-              },
-              {
-                id: 'rec-date-2',
-                title: 'Date Night #2: Japanese Omakase Night',
-                date: `${monthString}-12`,
-                time: '19:45 - 22:00',
-                note: 'Gerard asleep at home with Nanny Maya! Zero hospital or lawyer calls.',
-                category: 'Date Night' as EventCategory
-              },
-              {
-                id: 'rec-date-3',
-                title: 'Date Night #3: Post-Call Sunset Cocktails',
-                date: `${monthString}-24`,
-                time: '18:30 - 21:30',
-                note: 'Post-Call Evening! Suren fully rested after post-call sleep recovery.',
-                category: 'Date Night' as EventCategory
-              }
-            ].map((item) => {
-              const isAlreadyAdded = events.some((e) => e.startDate === item.date && e.title.includes('Date Night'));
+            {/* 3 Date Night Recommendations */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-black uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
+                <Heart className="w-4 h-4 text-rose-500" />
+                <span>💖 3 Recommended Couple Date Nights ({familyNames.husband} &amp; {familyNames.wife})</span>
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {dateNightRecs.map((item) => {
+                  const isAlreadyAdded = events.some((e) => e.startDate === item.date && e.title.includes('Date Night'));
 
-              return (
-                <div
-                  key={item.id}
-                  className="bg-rose-50/50 border border-rose-200/80 rounded-xl p-3 flex flex-col justify-between hover:border-rose-300 transition-all"
-                >
-                  <div>
-                    <div className="flex items-center justify-between text-[11px] font-bold text-rose-800 mb-1">
-                      <span>{item.date}</span>
-                      <span>{item.time}</span>
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-rose-50/50 border border-rose-200/80 rounded-xl p-3 flex flex-col justify-between hover:border-rose-300 transition-all"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between text-[11px] font-bold text-rose-800 mb-1">
+                          <span>{item.date}</span>
+                          <span>{item.time}</span>
+                        </div>
+                        <div className="text-xs font-bold text-slate-900 mb-1">{item.title}</div>
+                        <p className="text-[11px] text-slate-600 leading-snug mb-3">{item.note}</p>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          if (!isAlreadyAdded) {
+                            onAddEvent({
+                              id: `rec-added-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                              title: item.title,
+                              person: 'Family',
+                              category: item.category,
+                              startDate: item.date,
+                              startTime: item.time.split(' - ')[0],
+                              endDate: item.date,
+                              endTime: item.time.split(' - ')[1],
+                              location: 'Favorite Restaurant',
+                              notes: item.note,
+                              source: 'ai_suggested'
+                            });
+                          }
+                        }}
+                        className={`w-full py-1.5 px-3 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 ${
+                          isAlreadyAdded
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-rose-600 hover:bg-rose-700 text-white shadow-xs'
+                        }`}
+                      >
+                        {isAlreadyAdded ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Scheduled in Calendar</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Date Night to Calendar</span>
+                          </>
+                        )}
+                      </button>
                     </div>
-                    <div className="text-xs font-bold text-slate-900 mb-1">{item.title}</div>
-                    <p className="text-[11px] text-slate-600 leading-snug mb-3">{item.note}</p>
-                  </div>
+                  );
+                })}
+              </div>
+            </div>
 
-                  <button
-                    onClick={() => {
-                      if (!isAlreadyAdded) {
-                        onAddEvent({
-                          id: `rec-added-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-                          title: item.title,
-                          person: 'Family',
-                          category: item.category,
-                          startDate: item.date,
-                          startTime: item.time.split(' - ')[0],
-                          endDate: item.date,
-                          endTime: item.time.split(' - ')[1],
-                          location: 'Favorite Restaurant',
-                          notes: item.note,
-                          source: 'ai_suggested'
-                        });
-                      }
-                    }}
-                    className={`w-full py-1.5 px-3 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 ${
-                      isAlreadyAdded
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                        : 'bg-rose-600 hover:bg-rose-700 text-white shadow-xs'
-                    }`}
-                  >
-                    {isAlreadyAdded ? (
-                      <>
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Scheduled in Calendar</span>
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Date Night to Calendar</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+            {/* 3 Family Time Recommendations */}
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <h4 className="text-xs font-black uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
+                <Sun className="w-4 h-4 text-emerald-500" />
+                <span>👨‍👩‍👦 3 Recommended Family Time Outings ({familyNames.husband}, {familyNames.wife} &amp; {familyNames.child})</span>
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {familyRecs.map((item) => {
+                  const isAlreadyAdded = events.some((e) => e.startDate === item.date && (e.title.includes('Family Time') || e.title.includes('Family Saturday') || e.title.includes('Sunday Family')));
 
-        {/* 3 Family Time Recommendations */}
-        <div className="space-y-2 pt-2 border-t border-slate-100">
-          <h4 className="text-xs font-black uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
-            <Sun className="w-4 h-4 text-emerald-500" />
-            <span>👨‍👩‍👦 3 Recommended Family Time Outings (Suren, Nicole &amp; Gerard)</span>
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {[
-              {
-                id: 'rec-fam-1',
-                title: 'Family Time #1: Botanical Gardens & Ice Cream',
-                date: `${monthString}-08`,
-                time: '15:30 - 18:00',
-                note: 'Dr. Surentheran & Lawyer Nicole both free! Playground & ice cream with 2yo Gerard.',
-                category: 'Family Outing' as EventCategory
-              },
-              {
-                id: 'rec-fam-2',
-                title: 'Family Time #2: Post-Call Sunday Beach & Splash Park',
-                date: `${monthString}-16`,
-                time: '15:30 - 18:30',
-                note: 'Suren post-call sleep completes at 15:00. Afternoon beach outing with Suren, Nicole & Gerard!',
-                category: 'Family Outing' as EventCategory
-              },
-              {
-                id: 'rec-fam-3',
-                title: 'Family Time #3: Sunday City Zoo & Picnic Day',
-                date: `${monthString}-22`,
-                time: '10:00 - 14:30',
-                note: 'Golden weekend window! Zero calls or hospital duty for both parents all day.',
-                category: 'Family Outing' as EventCategory
-              }
-            ].map((item) => {
-              const isAlreadyAdded = events.some((e) => e.startDate === item.date && (e.title.includes('Family Time') || e.title.includes('Family Saturday') || e.title.includes('Sunday Family')));
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-emerald-50/50 border border-emerald-200/80 rounded-xl p-3 flex flex-col justify-between hover:border-emerald-300 transition-all"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between text-[11px] font-bold text-emerald-800 mb-1">
+                          <span>{item.date}</span>
+                          <span>{item.time}</span>
+                        </div>
+                        <div className="text-xs font-bold text-slate-900 mb-1">{item.title}</div>
+                        <p className="text-[11px] text-slate-600 leading-snug mb-3">{item.note}</p>
+                      </div>
 
-              return (
-                <div
-                  key={item.id}
-                  className="bg-emerald-50/50 border border-emerald-200/80 rounded-xl p-3 flex flex-col justify-between hover:border-emerald-300 transition-all"
-                >
-                  <div>
-                    <div className="flex items-center justify-between text-[11px] font-bold text-emerald-800 mb-1">
-                      <span>{item.date}</span>
-                      <span>{item.time}</span>
+                      <button
+                        onClick={() => {
+                          if (!isAlreadyAdded) {
+                            onAddEvent({
+                              id: `rec-added-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                              title: item.title,
+                              person: 'Family',
+                              category: item.category,
+                              startDate: item.date,
+                              startTime: item.time.split(' - ')[0],
+                              endDate: item.date,
+                              endTime: item.time.split(' - ')[1],
+                              location: 'Family Outing Park / Zoo',
+                              notes: item.note,
+                              source: 'ai_suggested'
+                            });
+                          }
+                        }}
+                        className={`w-full py-1.5 px-3 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 ${
+                          isAlreadyAdded
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                        }`}
+                      >
+                        {isAlreadyAdded ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Scheduled in Calendar</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Family Time to Calendar</span>
+                          </>
+                        )}
+                      </button>
                     </div>
-                    <div className="text-xs font-bold text-slate-900 mb-1">{item.title}</div>
-                    <p className="text-[11px] text-slate-600 leading-snug mb-3">{item.note}</p>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      if (!isAlreadyAdded) {
-                        onAddEvent({
-                          id: `rec-added-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-                          title: item.title,
-                          person: 'Family',
-                          category: item.category,
-                          startDate: item.date,
-                          startTime: item.time.split(' - ')[0],
-                          endDate: item.date,
-                          endTime: item.time.split(' - ')[1],
-                          location: 'Family Outing Park / Zoo',
-                          notes: item.note,
-                          source: 'ai_suggested'
-                        });
-                      }
-                    }}
-                    className={`w-full py-1.5 px-3 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 ${
-                      isAlreadyAdded
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                    }`}
-                  >
-                    {isAlreadyAdded ? (
-                      <>
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Scheduled in Calendar</span>
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Family Time to Calendar</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Legend Bar */}
       <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-600 px-2">
@@ -834,7 +1104,11 @@ export const CalendarView: React.FC<Props> = ({
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-full bg-cyan-500" />
-          <span>2yo Noah Care / Nursery</span>
+          <span>2yo Gerard Care / Nursery</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-gray-500 border border-gray-600" />
+          <span>Church & Catechism Activities</span>
         </div>
       </div>
 
@@ -854,6 +1128,208 @@ export const CalendarView: React.FC<Props> = ({
         {/* Grid Cells */}
         <div className="grid grid-cols-7 border-l border-t border-slate-200">
           {renderCalendarCells()}
+        </div>
+      </div>
+
+      {/* Monthly Event List View (Optimized for Mobile & Quick Overview) */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
+        {/* Header Bar */}
+        <div className="bg-slate-900 text-white p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="w-5 h-5 text-sky-400" />
+              <h3 className="text-base sm:text-lg font-extrabold tracking-tight">
+                {monthNames[currentMonth]} {currentYear} — Monthly Schedule List
+              </h3>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Complete chronological list of {currentMonthEvents.length} event(s) for easy mobile reading
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Search filter input */}
+            <div className="relative flex-1 sm:w-64">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search events, location, person..."
+                value={monthListSearch}
+                onChange={(e) => setMonthListSearch(e.target.value)}
+                className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-800 text-white placeholder-slate-400 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+              {monthListSearch && (
+                <button
+                  onClick={() => setMonthListSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => onOpenAddModal()}
+              className="px-3 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl transition-colors flex items-center gap-1 shrink-0 shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Event</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Filter Bar for Mobile List */}
+        <div className="bg-slate-800 border-b border-slate-700/80 px-4 py-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-xs font-semibold">
+          <span className="text-slate-400 text-[11px] shrink-0 mr-1 flex items-center gap-1">
+            <Filter className="w-3 h-3 text-sky-400" /> Filter:
+          </span>
+          {[
+            { id: 'all', label: `All (${events.filter(e => e.startDate && e.startDate.startsWith(monthString)).length})` },
+            { id: 'calls', label: `🚨 Call Duties (${monthCallDuties.length})` },
+            { id: 'dates', label: '💖 Date Nights' },
+            { id: 'family', label: '👨‍👩‍👦 Family Outings' },
+            { id: 'husband', label: `🩺 ${familyNames.husband}` },
+            { id: 'wife', label: `⚖️ ${familyNames.wife}` },
+            { id: 'child', label: `🧸 ${familyNames.child}` },
+          ].map((pill) => (
+            <button
+              key={pill.id}
+              onClick={() => setListCategoryFilter(pill.id as any)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${
+                listCategoryFilter === pill.id
+                  ? 'bg-sky-500 text-white shadow-xs'
+                  : 'bg-slate-700/70 text-slate-300 hover:bg-slate-700 hover:text-white'
+              }`}
+            >
+              {pill.label}
+            </button>
+          ))}
+
+          {onCancelMonthCallDuties && monthCallDuties.length > 0 && (
+            <button
+              onClick={() => setIsCancelCallsModalOpen(true)}
+              className="ml-auto shrink-0 px-2.5 py-1 text-xs font-black text-red-200 bg-red-900/80 hover:bg-red-800 border border-red-700/80 rounded-lg transition-colors flex items-center gap-1"
+              title="Cancel all call duties for the whole month"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
+              <span>Cancel Month Calls ({monthCallDuties.length})</span>
+            </button>
+          )}
+        </div>
+
+        {/* Event List Body */}
+        <div className="p-3 sm:p-6 space-y-5 max-h-[600px] overflow-y-auto divide-y divide-slate-100">
+          {sortedMonthDates.length === 0 ? (
+            <div className="text-center py-10 text-slate-500">
+              <p className="text-sm font-semibold">No events found for {monthNames[currentMonth]} {currentYear}.</p>
+              {monthListSearch && (
+                <p className="text-xs text-slate-400 mt-1">Try clearing your search query "{monthListSearch}".</p>
+              )}
+              <button
+                onClick={() => onOpenAddModal()}
+                className="mt-4 px-4 py-2 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl shadow-xs transition-colors"
+              >
+                + Add Event for {monthNames[currentMonth]}
+              </button>
+            </div>
+          ) : (
+            sortedMonthDates.map((dateKey) => {
+              const dayEvents = monthEventsByDate[dateKey];
+              const dateObj = new Date(dateKey + 'T00:00:00');
+              const formattedDateStr = isNaN(dateObj.getTime())
+                ? dateKey
+                : dateObj.toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  });
+
+              const isToday = new Date().toISOString().slice(0, 10) === dateKey;
+
+              return (
+                <div key={dateKey} className="pt-4 first:pt-0 space-y-2.5">
+                  {/* Date Header Banner */}
+                  <div className={`flex items-center justify-between px-3.5 py-1.5 rounded-xl border text-xs font-bold ${
+                    isToday
+                      ? 'bg-sky-100 border-sky-300 text-sky-950'
+                      : 'bg-slate-100 border-slate-200 text-slate-800'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon className="w-3.5 h-3.5 text-sky-600" />
+                      <span>{formattedDateStr}</span>
+                      {isToday && (
+                        <span className="px-2 py-0.5 text-[10px] font-black uppercase bg-sky-600 text-white rounded-full">
+                          Today
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      {dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}
+                    </span>
+                  </div>
+
+                  {/* Events for this Date */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {dayEvents.map((event) => (
+                      <div
+                        key={event.id}
+                        className={`p-3.5 rounded-xl border transition-all hover:shadow-sm flex items-start justify-between gap-3 ${getBadgeStyle(event)}`}
+                      >
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs sm:text-sm font-extrabold text-slate-900 truncate">
+                              {event.title}
+                            </span>
+                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-white/90 border border-slate-300 shadow-2xs">
+                              {event.person}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-700">
+                            <span className="flex items-center gap-1 font-bold">
+                              <Clock className="w-3.5 h-3.5 text-slate-500" />
+                              {event.startTime || '09:00'} - {event.endTime || '17:00'}
+                            </span>
+                            {event.location && (
+                              <span className="flex items-center gap-1 font-medium text-slate-600 truncate">
+                                <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                {event.location}
+                              </span>
+                            )}
+                          </div>
+
+                          {event.notes && (
+                            <p className="text-xs text-slate-600 italic line-clamp-2 pt-0.5">
+                              "{event.notes}"
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Edit / Delete Action Buttons */}
+                        <div className="flex items-center gap-1 shrink-0 pt-0.5">
+                          <button
+                            onClick={() => onEditEvent(event)}
+                            className="p-1.5 rounded-lg bg-white/90 hover:bg-white text-slate-700 hover:text-sky-700 transition-colors border border-slate-200 shadow-2xs"
+                            title="Edit Event"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => onDeleteEvent(event.id)}
+                            className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors border border-red-200"
+                            title="Delete Event"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -962,18 +1438,6 @@ export const CalendarView: React.FC<Props> = ({
                   onClick={() => {
                     const dt = selectedDayDate;
                     setSelectedDayDate(null);
-                    onOpenAddModal(dt, 'On-Call 24h');
-                  }}
-                  className="px-3.5 py-2 text-xs font-black text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
-                >
-                  <Stethoscope className="w-3.5 h-3.5" />
-                  <span>Add 24h Call</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    const dt = selectedDayDate;
-                    setSelectedDayDate(null);
                     onOpenAddModal(dt);
                   }}
                   className="px-3.5 py-2 text-xs font-bold text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 rounded-xl transition-colors flex items-center gap-1"
@@ -989,6 +1453,73 @@ export const CalendarView: React.FC<Props> = ({
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Month Call Duties Confirmation Modal */}
+      {isCancelCallsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-red-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-red-600 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-white" />
+                <h3 className="text-base font-black">
+                  Cancel {monthNames[currentMonth]} Call Duties
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsCancelCallsModalOpen(false)}
+                className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs text-slate-700">
+              <p className="text-sm font-semibold text-slate-900 leading-snug">
+                Are you sure you want to cancel all hospital on-call duties and post-call recovery days for <strong className="text-red-700">{monthNames[currentMonth]} {currentYear}</strong>?
+              </p>
+
+              <div className="bg-red-50 border border-red-200 p-3.5 rounded-xl space-y-1.5 text-red-950">
+                <div className="font-extrabold text-xs flex items-center gap-1.5 text-red-900">
+                  <CheckCircle2 className="w-4 h-4 text-red-600" />
+                  <span>Shifts to be cancelled ({monthCallDuties.length} total):</span>
+                </div>
+                <ul className="list-disc list-inside text-[11px] font-medium space-y-1 pt-1 text-slate-800 max-h-40 overflow-y-auto">
+                  {monthCallDuties.map((item) => (
+                    <li key={item.id} className="truncate">
+                      <strong>{item.startDate}</strong>: {item.title} ({item.startTime} - {item.endTime})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <p className="text-slate-500 italic">
+                💡 Tip: You can easily restore these shifts using the <strong>Undo Action</strong> button at any time.
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  onClick={() => setIsCancelCallsModalOpen(false)}
+                  className="px-4 py-2 font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  Keep Call Duties
+                </button>
+                <button
+                  onClick={() => {
+                    if (onCancelMonthCallDuties) {
+                      onCancelMonthCallDuties(currentYear, currentMonth);
+                    }
+                    setIsCancelCallsModalOpen(false);
+                  }}
+                  className="px-5 py-2 font-black text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-md transition-colors flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Yes, Cancel All ({monthCallDuties.length})</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

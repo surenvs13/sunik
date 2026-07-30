@@ -14,13 +14,15 @@ import {
   User,
   Edit3,
   History,
-  Undo2
+  Undo2,
+  Trash2
 } from 'lucide-react';
 
 interface Props {
   activeTab: 'calendar' | 'freetimings' | 'import' | 'history' | 'childcare';
   setActiveTab: (tab: 'calendar' | 'freetimings' | 'import' | 'history' | 'childcare') => void;
   onResetData: () => void;
+  onDeleteAllEvents?: () => void;
   eventCount: number;
   freeSlotsCount: number;
   gapsCount: number;
@@ -36,6 +38,7 @@ export const Navbar: React.FC<Props> = ({
   activeTab,
   setActiveTab,
   onResetData,
+  onDeleteAllEvents,
   eventCount,
   freeSlotsCount,
   gapsCount,
@@ -82,14 +85,17 @@ export const Navbar: React.FC<Props> = ({
           {/* Edit Family Names Button */}
           <button
             onClick={onOpenEditNames}
-            className="bg-slate-800 hover:bg-slate-700/80 px-3 py-1.5 rounded-xl border border-sky-500/30 flex items-center gap-1.5 text-xs transition-all shadow-xs"
-            title="Edit Family Member Names"
+            className="bg-slate-800 hover:bg-slate-700/90 px-3 py-1.5 rounded-xl border border-sky-500/40 hover:border-sky-400 flex items-center gap-2 text-xs transition-all shadow-xs cursor-pointer group"
+            title="Click to Edit Family Member Names"
           >
-            <User className="w-3.5 h-3.5 text-sky-400" />
+            <User className="w-3.5 h-3.5 text-sky-400 group-hover:scale-110 transition-transform" />
             <span className="font-bold text-white">
-              {familyNames.husband} &amp; {familyNames.wife.split(' ')[0]} ({familyNames.child.split(' ')[0]})
+              {familyNames.husband} &amp; {familyNames.wife} ({familyNames.child})
             </span>
-            <Edit3 className="w-3 h-3 text-sky-400 ml-1" />
+            <span className="ml-1 px-2 py-0.5 text-[10px] font-black bg-sky-500/20 text-sky-300 border border-sky-400/40 rounded-md flex items-center gap-1 group-hover:bg-sky-500 group-hover:text-white transition-all">
+              <Edit3 className="w-2.5 h-2.5" />
+              Edit Names
+            </span>
           </button>
 
           <div className="bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/80 flex items-center gap-2">
@@ -124,6 +130,18 @@ export const Navbar: React.FC<Props> = ({
             >
               <Undo2 className="w-3.5 h-3.5" />
               <span>Undo Action</span>
+            </button>
+          )}
+
+          {onDeleteAllEvents && (
+            <button
+              onClick={onDeleteAllEvents}
+              disabled={eventCount === 0}
+              className="p-2 text-rose-400 hover:text-rose-200 hover:bg-rose-950/60 disabled:opacity-40 disabled:pointer-events-none rounded-xl transition-colors text-xs flex items-center gap-1 border border-rose-800/60"
+              title="Delete All Calendar Events"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span className="hidden sm:inline font-bold">Delete All</span>
             </button>
           )}
 
